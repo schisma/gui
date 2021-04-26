@@ -1,0 +1,30 @@
+{ name = "schisma-gui"
+, dependencies =
+  [ "aff-bus"
+  , "affjax"
+  , "argonaut"
+  , "arrays"
+  , "console"
+  , "effect"
+  , "foreign-generic"
+  , "foreign-object"
+  , "halogen"
+  , "halogen-subscriptions"
+  , "integers"
+  , "lists"
+  , "media-types"
+  , "monad-logger"
+  , "ordered-collections"
+  , "psci-support"
+  , "purescript-uuid"
+  , "record"
+  , "routing"
+  , "routing-duplex"
+  , "string-parsers"
+  , "strings"
+  , "transformers"
+  , "tuples"
+  ]
+, packages = ./packages.dhall
+, sources = [ "src/**/*.purs", "test/**/*.purs" ]
+}

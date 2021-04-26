@@ -1,0 +1,163 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.tracker,
+.settings {
+  min-height: 47vh;
+  max-height: 47vh;
+  width: 100%;
+}
+
+.tracker .ht_clone_top th.mute {
+  font-style: italic;
+}
+
+.tracker .ht_clone_top th.solo {
+  font-weight: bold;
+}
+
+.nav-link {
+  @apply text-center;
+  @apply block;
+  @apply border;
+  @apply border-white;
+  @apply text-blue-500;
+  @apply rounded;
+  @apply py-2;
+  @apply px-4;
+}
+
+.nav-link:hover {
+  @apply border-gray-200;
+  @apply bg-gray-200;
+}
+
+.nav-link.active {
+  @apply border-blue-500;
+  @apply bg-blue-500;
+  @apply text-white;
+}
+
+.nav-link.active:hover {
+  @apply bg-blue-700;
+}
+
+.panel {
+  @apply text-gray-400;
+  @apply font-bold;
+}
+
+.pseudo-hidden {
+  height: 0;
+  width: 0;
+  overflow: hidden;
+}
+
+.synth-controls {
+  height: 47vh;
+}
+
+.btn {
+  @apply bg-transparent;
+  @apply border;
+  @apply rounded;
+  @apply shadow;
+}
+
+.btn-normal {
+  @apply py-2;
+  @apply px-4;
+}
+
+.btn-green {
+  @apply btn;
+  @apply text-green-300;
+  @apply border-green-200;
+}
+
+.btn-green:hover {
+  @apply bg-green-50;
+}
+
+.btn-blue {
+  @apply btn;
+  @apply text-blue-300;
+  @apply border-blue-200;
+}
+
+.btn-blue:hover {
+  @apply bg-blue-50;
+}
+
+.btn-red {
+  @apply btn;
+  @apply text-red-300;
+  @apply border-red-200;
+}
+
+.btn-red:hover {
+  @apply bg-red-50;
+}
+
+.btn-purple {
+  @apply btn;
+  @apply text-purple-300;
+  @apply border-purple-200;
+}
+
+.btn-purple:hover {
+  @apply bg-purple-50;
+}
+
+.btn-white {
+  @apply btn;
+  @apply bg-white;
+  @apply border-gray-300;
+}
+
+.btn-white:hover {
+  @apply bg-gray-50;
+}
+
+.input {
+  @apply block;
+  @apply appearance-none;
+  @apply w-full;
+  @apply bg-white;
+  @apply border;
+  @apply border-gray-300;
+  @apply px-4;
+  @apply py-2;
+  @apply pr-8;
+  @apply rounded;
+  @apply shadow;
+  @apply leading-tight;
+}
+
+.input:hover {
+  @apply border-gray-400;
+}
+
+.input:focus {
+  @apply outline-none;
+  @apply ring;
+}
+
+.select-arrow {
+  @apply pointer-events-none;
+  @apply absolute;
+  @apply inset-y-0;
+  @apply right-0;
+  @apply flex;
+  @apply items-center;
+  @apply px-2;
+}
+
+.radio-parent span {
+  display: inline-block;
+}
+
+.width-60 {
+  width: 60px;
+}

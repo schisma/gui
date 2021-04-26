@@ -1,0 +1,14 @@
+#!/usr/bin/env node
+
+const midi = require('midi');
+
+const input = new midi.Input();
+const ports = input.getPortCount();
+
+console.log('Port # | Name');
+
+[...Array(ports).keys()].forEach(port => {
+  const formattedPort = `${port}`.padStart(6, ' ');
+  const name = input.getPortName(port);
+  console.log(`${formattedPort} | ${name}`);
+});
