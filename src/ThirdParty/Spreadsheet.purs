@@ -12,6 +12,7 @@ type Callbacks
   = { afterChange :: Spreadsheet -> Effect Unit
     , afterCreateRow :: Spreadsheet -> Effect Unit
     , afterRemoveRow :: Spreadsheet -> Effect Unit
+    , onBlur :: Spreadsheet -> Effect Unit
     , onMute :: Spreadsheet -> Effect Unit
     , onPlay :: Spreadsheet -> Effect Unit
     , onPlayOnlyMidi :: Spreadsheet -> Effect Unit

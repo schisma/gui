@@ -12,6 +12,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 import Halogen.Subscription as HS
+import Web.HTML.HTMLElement (focus)
 
 import Capabilities.LogMessage (class LogMessage)
 import Capabilities.Resources.Midi (class ManageMidi, sendMidiMessage)
@@ -37,19 +38,23 @@ data Action
   | Initialize
   | Receive { | Connect.WithGlobalState () }
 
+data Query a
+  = Focus a
+
 component
-  :: forall q m r
+  :: forall m r
    . MonadAff m
   => LogMessage m
   => MonadAsk { globalEnvironment :: GlobalEnvironment | r } m
   => ManageMidi m
-  => H.Component q Input Void m
+  => H.Component Query Input Void m
 component =
   H.mkComponent
     { initialState: identity
     , render
     , eval: H.mkEval $ H.defaultEval
       { handleAction = handleAction
+      , handleQuery = handleQuery
       , initialize = Just Initialize
       , receive = Just <<< Receive
       }
@@ -87,11 +92,21 @@ component =
 
       let callback = (\message -> HS.notify listener (ForwardMessage message))
 
-      H.getHTMLElementRef (H.RefLabel "midi-keyboard") >>= traverse_ \element -> do
+      H.getHTMLElementRef (H.RefLabel "midi-keyboard") >>= traverse_ \element ->
         H.liftEffect $ midiKeyboard element callback
 
     Receive { globalState } -> do
        H.modify_ _ { globalState = globalState }
+
+  handleQuery
+    :: forall a. Query a
+    -> H.HalogenM State Action Slots Void m (Maybe a)
+  handleQuery = case _ of
+    Focus a -> do
+      H.getHTMLElementRef (H.RefLabel "midi-keyboard") >>= traverse_ \element ->
+        H.liftEffect $ focus element
+
+      pure (Just a)
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =

@@ -79,6 +79,7 @@ class Spreadsheet {
   blur() {
     this.spreadsheet.deselectCell();
     this.spreadsheet.unlisten();
+    this.callbacks.onBlur(this)();
   }
 
   _createSpreadsheet(spreadsheetElement, readOnlyColumnIndices) {
@@ -173,8 +174,6 @@ class Spreadsheet {
     if (event.key == 'Escape') {
       if (!this.isEditing) {
         this.blur();
-        // TODO: Fix
-        //document.getElementById('midi-keyboard').focus();
       }
 
       if (this.isEditing) {

@@ -62,7 +62,8 @@ type State
     }
 
 data Action
-  = Initialize
+  = Blur
+  | Initialize
   | Play Int Int
   | PlayOnlyMidi Spreadsheet
   | PlayTracker Spreadsheet
@@ -75,6 +76,9 @@ data Action
   | ToggleSoloSelectedTrack
   | UpdateTrackerData Spreadsheet
 
+data Output
+  = Blurred
+
 component
   :: forall q m r
    . MonadAff m
@@ -82,7 +86,7 @@ component
   => MonadAsk { globalEnvironment :: GlobalEnvironment | r } m
   => ManageMidi m
   => ManageTracker m
-  => H.Component q Input Void m
+  => H.Component q Input Output m
 component =
   H.mkComponent
     { initialState: Record.insert (Proxy :: _ "tracker") Nothing
@@ -95,8 +99,11 @@ component =
     }
   where
 
-  handleAction :: Action -> H.HalogenM State Action Slots Void m Unit
+  handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
+    Blur -> do
+      H.raise Blurred
+
     Initialize -> do
       { emitter, listener } <- H.liftEffect HS.create
       void $ H.subscribe emitter
@@ -107,6 +114,8 @@ component =
                           HS.notify listener (UpdateTrackerData sheet)
                       , afterRemoveRow: \sheet ->
                           HS.notify listener (UpdateTrackerData sheet)
+                      , onBlur: \sheet ->
+                          HS.notify listener Blur
                       , onMute: \sheet ->
                           HS.notify listener ToggleMuteSelectedTrack
                       , onPlay: \sheet ->

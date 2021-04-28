@@ -3,6 +3,7 @@ module Components.Home where
 import Prelude
 
 import Control.Monad.Reader (class MonadAsk)
+import Data.Const (Const)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
@@ -22,9 +23,9 @@ import Data.Component (OpaqueSlot)
 import Env (GlobalEnvironment)
 
 type Slots
-  = ( midiKeyboard :: OpaqueSlot Unit
+  = ( midiKeyboard :: H.Slot MidiKeyboard.Query Void Unit
     , settings :: OpaqueSlot Unit
-    , tracker :: OpaqueSlot Unit
+    , tracker :: H.Slot (Const Void) Tracker.Output Unit
     )
 
 type Input
@@ -36,7 +37,8 @@ type State
     }
 
 data Action
-  = Receive { | Connect.WithGlobalState () }
+  = HandleTracker Tracker.Output
+  | Receive { | Connect.WithGlobalState () }
 
 component
   :: forall q m r
@@ -59,6 +61,11 @@ component = H.mkComponent
 
   handleAction :: Action -> H.HalogenM State Action Slots Void m Unit
   handleAction = case _ of
+    HandleTracker output ->
+      case output of
+        Tracker.Blurred ->
+          H.tell (Proxy :: _ "midiKeyboard") unit MidiKeyboard.Focus
+
     Receive { globalState } ->
       H.modify_ _ { globalState = globalState }
 
@@ -79,7 +86,7 @@ component = H.mkComponent
               unit
               Tracker.component
               { globalState: state.globalState }
-              absurd
+              HandleTracker
 
           , HH.slot
               (Proxy :: _ "settings")
