@@ -33,6 +33,7 @@ import Env (GlobalEnvironment, GlobalState)
 import State.Global ( addInstrument
                     , getSelectedTrackAndInstrument
                     , setInstruments
+                    , setInstrumentsFile
                     , setTrackerFile
                     )
 
@@ -113,9 +114,7 @@ component =
 
     LoadInstrumentsFromFile mouseEvent file -> do
       H.liftEffect $ preventDefault (toEvent mouseEvent)
-
-      -- TODO: instrumentsFile and trackerFile should just be local state
-      -- TODO: (no need for) setInstrumentsFile...
+      setInstrumentsFile file
 
       globalState <- H.gets _.globalState
       case globalState.synths of
