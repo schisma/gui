@@ -53,8 +53,8 @@ router.put('/play', function(req, res, next) {
     'play',
     '-t', trackerFile,
     '-i', instrumentsFile,
-    '-s', req.body.start,
-    '-e', req.body.end,
+    '-s', req.body.startLine,
+    '-e', req.body.endLine,
   ], {
     detached: true,
     stdio: 'ignore'
