@@ -17,6 +17,7 @@ import Capabilities.LogMessage (class LogMessage)
 import Capabilities.Resources.Midi (class ManageMidi)
 import Components.Dial as Dial
 import Components.Radio as Radio
+import Components.Slider as Slider
 import Components.Toggle as Toggle
 import Data.Instrument (Instrument)
 import Data.Synth (SynthParameter)
@@ -25,6 +26,7 @@ import Env (GlobalEnvironment)
 type Slots
   = ( dial :: H.Slot (Const Void) Dial.Output (Tuple Int String)
     , radio :: H.Slot (Const Void) Radio.Output (Tuple Int String)
+    , slider :: H.Slot (Const Void) Slider.Output (Tuple Int String)
     , toggle :: H.Slot (Const Void) Toggle.Output (Tuple Int String)
     )
 
@@ -39,6 +41,7 @@ type State
 data Action
   = HandleDial Dial.Output
   | HandleRadio Radio.Output
+  | HandleSlider Slider.Output
   | HandleToggle Toggle.Output
   | Receive { selectedInstrument :: Instrument }
 
@@ -73,6 +76,11 @@ component =
     HandleRadio output ->
       case output of
         Radio.UpdatedSynthParameter synthParameter instrument ->
+          H.raise (UpdatedSynthParameter synthParameter instrument)
+
+    HandleSlider output ->
+      case output of
+        Slider.UpdatedSynthParameter synthParameter instrument ->
           H.raise (UpdatedSynthParameter synthParameter instrument)
 
     HandleToggle output ->
@@ -131,6 +139,32 @@ component =
               , synthParameter
               }
               HandleRadio
+          ]
+        Nothing -> []
+
+  renderSlider
+    :: State
+    -> String
+    -> String
+    -> Array (H.ComponentHTML Action Slots m)
+  renderSlider state name displayName =
+    let selectedInstrument = state.selectedInstrument
+        parameters = selectedInstrument.synth.parameters
+        maybeSynthParameter = find (\p -> p.name == name) parameters
+    in
+      case maybeSynthParameter of
+        Just synthParameter ->
+          [ HH.slot
+              (Proxy :: _ "slider")
+              (Tuple selectedInstrument.id synthParameter.name)
+              Slider.component
+              { displayName
+              , selectedInstrument
+              , showNumber: true
+              , size: [20, 75]
+              , synthParameter
+              }
+              HandleSlider
           ]
         Nothing -> []
 
@@ -276,7 +310,6 @@ component =
                     [ HH.div
                         [ HP.class_ (HH.ClassName "text-center") ]
                         [ HH.h3_ [ HH.text "Wheel Mod"] ]
-                    -- TODO: Wheel mod amount
                     , HH.div
                       [ HP.classes
                         (map HH.ClassName [ "inline-block", "mr-5" ])
@@ -307,6 +340,11 @@ component =
                         (map HH.ClassName [ "inline-block", "mr-5" ])
                       ]
                       (renderToggle state "wheelModDestinationFilter" "Filter")
+                    , HH.div
+                      [ HP.classes
+                        (map HH.ClassName [ "inline-block", "mr-5" ])
+                      ]
+                      (renderSlider state "wheelModAmount" "Mod")
                     ]
                 ]
             , HH.div

@@ -35,6 +35,30 @@ exports._radio = function(id, options, onChangeCallback) {
   return radio;
 }
 
+exports._slider = function(id, options, onChangeCallback) {
+  const settings = Object.assign({}, options, {
+    mode: 'relative'
+  });
+
+  const slider = new NexusUI.Slider(id, settings);
+
+  slider.on('change', debounce(function(value) {
+    onChangeCallback(value)();
+  }, 100));
+
+  return slider;
+}
+
+exports._sliderWithNumber = function(id, numberId, options, onChangeCallback) {
+  const slider = this._slider(id, options, onChangeCallback);
+  const number = new NexusUI.Number(numberId);
+
+  number.link(slider);
+
+  return slider;
+}
+
+
 exports._updateDialValue = function(dial, value) {
   dial.value = value;
   return dial;

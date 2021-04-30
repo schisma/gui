@@ -8,21 +8,18 @@ import Web.HTML (HTMLElement)
 
 foreign import data Dial ∷ Type
 
-foreign import data Toggle ∷ Type
-
 foreign import data Radio ∷ Type
 
+foreign import data Slider ∷ Type
+
+foreign import data Toggle ∷ Type
+
 type DialOptions
-  = { size :: Array Int
-    , min :: Number
+  = { min :: Number
     , max :: Number
+    , size :: Array Int
     , step :: Number
     , value :: Number
-    }
-
-type ToggleOptions
-  = { size :: Array Int
-    , state :: Boolean
     }
 
 type RadioOptions
@@ -31,6 +28,18 @@ type RadioOptions
     , size :: Array Int
     }
 
+type ToggleOptions
+  = { size :: Array Int
+    , state :: Boolean
+    }
+
+type SliderOptions
+  = { min :: Number
+    , max :: Number
+    , size :: Array Int
+    , step :: Number
+    , value :: Number
+    }
 
 foreign import _dial
   :: EffectFn3 HTMLElement DialOptions (Number -> Effect Unit) Dial
@@ -63,6 +72,43 @@ updateDialValue :: Dial -> Number -> Effect Dial
 updateDialValue nexusDial value = runEffectFn2 _updateDialValue nexusDial value
 
 
+foreign import _radio
+  :: EffectFn3 HTMLElement RadioOptions (Number -> Effect Unit) Radio
+
+radio
+  :: HTMLElement
+  -> RadioOptions
+  -> (Number -> Effect Unit)
+  -> Effect Radio
+radio element options onChangeCallback =
+  runEffectFn3 _radio element options onChangeCallback
+
+
+foreign import _slider
+  :: EffectFn3 HTMLElement SliderOptions (Number -> Effect Unit) Slider
+
+slider
+  :: HTMLElement
+  -> SliderOptions
+  -> (Number -> Effect Unit)
+  -> Effect Slider
+slider element options onChangeCallback =
+  runEffectFn3 _slider element options onChangeCallback
+
+
+foreign import _sliderWithNumber
+  :: EffectFn4 HTMLElement HTMLElement SliderOptions (Number -> Effect Unit) Slider
+
+sliderWithNumber
+  :: HTMLElement
+  -> HTMLElement
+  -> SliderOptions
+  -> (Number -> Effect Unit)
+  -> Effect Slider
+sliderWithNumber sliderElement numberElement options onChangeCallback =
+  runEffectFn4 _sliderWithNumber sliderElement numberElement options onChangeCallback
+
+
 foreign import _toggle
   :: EffectFn3 HTMLElement ToggleOptions (Boolean -> Effect Unit) Toggle
 
@@ -79,15 +125,3 @@ foreign import _updateToggleState :: EffectFn2 Toggle Number Toggle
 
 updateToggleState :: Toggle -> Number -> Effect Toggle
 updateToggleState nexusToggle value = runEffectFn2 _updateToggleState nexusToggle value
-
-
-foreign import _radio
-  :: EffectFn3 HTMLElement RadioOptions (Number -> Effect Unit) Radio
-
-radio
-  :: HTMLElement
-  -> RadioOptions
-  -> (Number -> Effect Unit)
-  -> Effect Radio
-radio element options onChangeCallback =
-  runEffectFn3 _radio element options onChangeCallback
