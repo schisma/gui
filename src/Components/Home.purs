@@ -71,28 +71,26 @@ component = H.mkComponent
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =
-    HH.div_
+    HH.div
+      [ HP.class_ (HH.ClassName "mx-2") ]
       [ HH.slot
+          (Proxy :: _ "tracker")
+          unit
+          Tracker.component
+          { globalState: state.globalState }
+          HandleTracker
+
+      , HH.slot
           (Proxy :: _ "midiKeyboard")
           unit
           MidiKeyboard.component
           { globalState: state.globalState }
           absurd
 
-      , HH.div
-          [ HP.class_ (HH.ClassName "mx-2") ]
-          [ HH.slot
-              (Proxy :: _ "tracker")
-              unit
-              Tracker.component
-              { globalState: state.globalState }
-              HandleTracker
-
-          , HH.slot
-              (Proxy :: _ "settings")
-              unit
-              Settings.component
-              { globalState: state.globalState }
-              absurd
-          ]
+      , HH.slot
+          (Proxy :: _ "settings")
+          unit
+          Settings.component
+          { globalState: state.globalState }
+          absurd
       ]
