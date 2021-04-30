@@ -11,7 +11,7 @@ exports._dial = function(id, options, onChangeCallback) {
 
   dial.on('change', debounce(function(value) {
     onChangeCallback(value)();
-  }, 700));
+  }, 100));
 
   return dial;
 }
