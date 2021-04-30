@@ -4,6 +4,7 @@ import Prelude
 
 import Control.Monad.Reader (class MonadAsk)
 import Data.Array (find)
+import Data.Const (Const)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (class MonadAff)
@@ -17,31 +18,32 @@ import Capabilities.Resources.Midi (class ManageMidi)
 import Components.Dial as Dial
 import Components.Radio as Radio
 import Components.Toggle as Toggle
-import Data.Component (OpaqueSlot)
 import Data.Instrument (Instrument)
-import Data.Track (Track)
+import Data.Synth (SynthParameter)
 import Env (GlobalEnvironment)
 
 type Slots
-  = ( dial :: OpaqueSlot (Tuple Int String)
-    , radio :: OpaqueSlot (Tuple Int String)
-    , toggle :: OpaqueSlot (Tuple Int String)
+  = ( dial :: H.Slot (Const Void) Dial.Output (Tuple Int String)
+    , radio :: H.Slot (Const Void) Radio.Output (Tuple Int String)
+    , toggle :: H.Slot (Const Void) Toggle.Output (Tuple Int String)
     )
 
 type Input
   = { selectedInstrument :: Instrument
-    , selectedTrack :: Track
     }
 
 type State
   = { selectedInstrument :: Instrument
-    , selectedTrack :: Track
     }
 
 data Action
-  = Receive { selectedInstrument :: Instrument
-            , selectedTrack :: Track
-            }
+  = HandleDial Dial.Output
+  | HandleRadio Radio.Output
+  | HandleToggle Toggle.Output
+  | Receive { selectedInstrument :: Instrument }
+
+data Output
+  = UpdatedSynthParameter SynthParameter Instrument
 
 component
   :: forall q m r
@@ -49,7 +51,7 @@ component
   => LogMessage m
   => MonadAsk { globalEnvironment :: GlobalEnvironment | r } m
   => ManageMidi m
-  => H.Component q Input Void m
+  => H.Component q Input Output m
 component =
   H.mkComponent
     { initialState: identity
@@ -61,11 +63,25 @@ component =
     }
   where
 
-  handleAction :: Action -> H.HalogenM State Action Slots Void m Unit
+  handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
-    Receive { selectedInstrument, selectedTrack } -> do
-      H.modify_ _ { selectedInstrument = selectedInstrument
-                  , selectedTrack = selectedTrack }
+    HandleDial output ->
+      case output of
+        Dial.UpdatedSynthParameter synthParameter instrument ->
+          H.raise (UpdatedSynthParameter synthParameter instrument)
+
+    HandleRadio output ->
+      case output of
+        Radio.UpdatedSynthParameter synthParameter instrument ->
+          H.raise (UpdatedSynthParameter synthParameter instrument)
+
+    HandleToggle output ->
+      case output of
+        Toggle.UpdatedSynthParameter synthParameter instrument ->
+          H.raise (UpdatedSynthParameter synthParameter instrument)
+
+    Receive { selectedInstrument} -> do
+      H.modify_ _ { selectedInstrument = selectedInstrument }
 
   renderDial
     :: State
@@ -73,8 +89,7 @@ component =
     -> String
     -> Array (H.ComponentHTML Action Slots m)
   renderDial state name displayName =
-    let selectedTrack = state.selectedTrack
-        selectedInstrument = state.selectedInstrument
+    let selectedInstrument = state.selectedInstrument
         parameters = selectedInstrument.synth.parameters
         maybeSynthParameter = find (\p -> p.name == name) parameters
     in
@@ -86,12 +101,11 @@ component =
               Dial.component
               { displayName
               , selectedInstrument
-              , selectedTrack
               , showNumber: true
               , size: 50
               , synthParameter
               }
-              absurd
+              HandleDial
           ]
         Nothing -> []
 
@@ -101,8 +115,7 @@ component =
     -> String
     -> Array (H.ComponentHTML Action Slots m)
   renderRadio state name displayName =
-    let selectedTrack = state.selectedTrack
-        selectedInstrument = state.selectedInstrument
+    let selectedInstrument = state.selectedInstrument
         parameters = selectedInstrument.synth.parameters
         maybeSynthParameter = find (\p -> p.name == name) parameters
     in
@@ -114,11 +127,10 @@ component =
               Radio.component
               { displayName
               , selectedInstrument
-              , selectedTrack
               , size: [180, 30]
               , synthParameter
               }
-              absurd
+              HandleRadio
           ]
         Nothing -> []
 
@@ -128,8 +140,7 @@ component =
     -> String
     -> Array (H.ComponentHTML Action Slots m)
   renderToggle state name displayName =
-    let selectedTrack = state.selectedTrack
-        selectedInstrument = state.selectedInstrument
+    let selectedInstrument = state.selectedInstrument
         parameters = selectedInstrument.synth.parameters
         maybeSynthParameter = find (\p -> p.name == name) parameters
     in
@@ -139,13 +150,12 @@ component =
               (Proxy :: _ "toggle")
               (Tuple selectedInstrument.id synthParameter.name)
               Toggle.component
-              { selectedTrack
+              { displayName
               , selectedInstrument
-              , synthParameter
               , size: 20
-              , displayName
+              , synthParameter
               }
-              absurd
+              HandleToggle
           ]
         Nothing -> []
 

@@ -14,9 +14,10 @@ import Record (merge)
 
 import Capabilities.LogMessage (class LogMessage)
 import Capabilities.Resources.Midi (class ManageMidi)
-import Data.Instrument (Instrument, updateSynthParameterValue)
+import Data.Instrument ( Instrument
+                       , updateSynthParameterValue
+                       )
 import Data.Synth (SynthParameter)
-import Data.Track (Track)
 import Env (GlobalEnvironment)
 import State.Global (updateInstrument)
 import ThirdParty.Nexus as Nexus
@@ -27,7 +28,6 @@ type Slots = ()
 type Input
   = { displayName :: String
     , selectedInstrument :: Instrument
-    , selectedTrack :: Track
     , showNumber :: Boolean
     , size :: Int
     , synthParameter :: SynthParameter
@@ -38,7 +38,6 @@ type State
     , displayName :: String
     , ignoreOnChangeHandler :: Boolean
     , selectedInstrument :: Instrument
-    , selectedTrack :: Track
     , showNumber :: Boolean
     , size :: Int
     , synthParameter :: SynthParameter
@@ -49,11 +48,13 @@ data Action
   | Initialize
   | Receive { displayName :: String
             , selectedInstrument :: Instrument
-            , selectedTrack :: Track
             , showNumber :: Boolean
             , size :: Int
             , synthParameter :: SynthParameter
             }
+
+data Output
+  = UpdatedSynthParameter SynthParameter Instrument
 
 component
   :: forall q m r
@@ -61,7 +62,7 @@ component
   => LogMessage m
   => MonadAsk { globalEnvironment :: GlobalEnvironment | r } m
   => ManageMidi m
-  => H.Component q Input Void m
+  => H.Component q Input Output m
 component =
   H.mkComponent
     { initialState: merge { dial: Nothing, ignoreOnChangeHandler: true }
@@ -74,7 +75,7 @@ component =
     }
   where
 
-  handleAction :: Action -> H.HalogenM State Action Slots Void m Unit
+  handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
     HandleChange value -> do
       state <- H.get
@@ -90,6 +91,8 @@ component =
                     , synthParameter = synthParameter
                     }
         updateInstrument instrument
+
+        H.raise (UpdatedSynthParameter synthParameter instrument)
 
     Initialize -> do
       state <- H.get
@@ -119,7 +122,6 @@ component =
     Receive record -> do
       H.modify_ _ { displayName = record.displayName
                   , selectedInstrument = record.selectedInstrument
-                  , selectedTrack = record.selectedTrack
                   , showNumber = record.showNumber
                   , size = record.size
                   , synthParameter = record.synthParameter

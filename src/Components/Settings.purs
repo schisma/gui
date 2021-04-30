@@ -24,7 +24,7 @@ import Capabilities.Resources.Instrument ( class ManageInstrument
 import Capabilities.Resources.Midi (class ManageMidi)
 import Components.HigherOrder.Connect as Connect
 import Components.Instrument as Instrument
-import Components.Synths.Profit as Profit
+import Components.Synth as Synth
 import Data.Component (OpaqueSlot)
 import Data.Instrument (Instrument)
 import Data.Synth (Synth)
@@ -39,7 +39,7 @@ import State.Global ( addInstrument
 
 type Slots
   = ( instrument :: OpaqueSlot Int
-    , profit :: OpaqueSlot Unit
+    , synth :: OpaqueSlot Unit
     )
 
 data Panel
@@ -316,7 +316,7 @@ component =
               ]
               [ HH.div
                   [ HP.class_ (HH.ClassName "synth-controls") ]
-                  (renderSelectedSynth state.globalState)
+                  (renderSynth state.globalState)
               ]
           ]
       ]
@@ -346,8 +346,8 @@ component =
           [ HH.text $ linkName panel ]
       ]
 
-  renderSelectedSynth :: GlobalState -> Array (H.ComponentHTML Action Slots m)
-  renderSelectedSynth globalState =
+  renderSynth :: GlobalState -> Array (H.ComponentHTML Action Slots m)
+  renderSynth globalState =
     let Tuple maybeTrack maybeInstrument =
           getSelectedTrackAndInstrument globalState
 
@@ -360,15 +360,12 @@ component =
               InstrumentTrack _ -> case maybeInstrument of
                 Nothing -> []
                 Just instrument ->
-                  case instrument.synth.name of
-                    "Profit" ->
-                      [ HH.slot
-                          (Proxy :: _ "profit")
-                          unit
-                          Profit.component
-                          { selectedInstrument: instrument
-                          , selectedTrack: track
-                          }
-                          absurd
-                      ]
-                    _ -> []
+                  [ HH.slot
+                      (Proxy :: _ "synth")
+                      unit
+                      Synth.component
+                      { selectedInstrument: instrument
+                      , socket: globalState.socket
+                      }
+                      absurd
+                  ]

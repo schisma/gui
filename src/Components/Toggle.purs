@@ -11,11 +11,10 @@ import Halogen.HTML.Properties as HP
 import Halogen.Subscription as HS
 import Record (merge)
 
-import Capabilities.LogMessage (class LogMessage, logDebug)
+import Capabilities.LogMessage (class LogMessage)
 import Capabilities.Resources.Midi (class ManageMidi)
 import Data.Instrument (Instrument, updateSynthParameterValue)
 import Data.Synth (SynthParameter)
-import Data.Track (Track)
 import Env (GlobalEnvironment)
 import State.Global (updateInstrument)
 import ThirdParty.Nexus as Nexus
@@ -26,7 +25,6 @@ type Slots = ()
 type Input
   = { displayName :: String
     , selectedInstrument :: Instrument
-    , selectedTrack :: Track
     , size :: Int
     , synthParameter :: SynthParameter
     }
@@ -34,7 +32,6 @@ type Input
 type State
   = { displayName :: String
     , selectedInstrument :: Instrument
-    , selectedTrack :: Track
     , size :: Int
     , synthParameter :: SynthParameter
     , toggle :: Maybe Nexus.Toggle
@@ -45,10 +42,12 @@ data Action
   | Initialize
   | Receive { displayName :: String
             , selectedInstrument :: Instrument
-            , selectedTrack :: Track
             , size :: Int
             , synthParameter :: SynthParameter
             }
+
+data Output
+  = UpdatedSynthParameter SynthParameter Instrument
 
 component
   :: forall q m r
@@ -56,7 +55,7 @@ component
   => LogMessage m
   => MonadAsk { globalEnvironment :: GlobalEnvironment | r } m
   => ManageMidi m
-  => H.Component q Input Void m
+  => H.Component q Input Output m
 component =
   H.mkComponent
     { initialState: merge { toggle: Nothing }
@@ -69,7 +68,7 @@ component =
     }
   where
 
-  handleAction :: Action -> H.HalogenM State Action Slots Void m Unit
+  handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
     HandleToggle toggleState -> do
       state <- H.get
@@ -83,6 +82,8 @@ component =
                   , synthParameter = synthParameter
                   }
       updateInstrument instrument
+
+      H.raise (UpdatedSynthParameter synthParameter instrument)
 
     Initialize -> do
       state <- H.get
@@ -104,7 +105,6 @@ component =
     Receive record -> do
       H.modify_ _ { displayName = record.displayName
                   , selectedInstrument = record.selectedInstrument
-                  , selectedTrack = record.selectedTrack
                   , size = record.size
                   }
 
