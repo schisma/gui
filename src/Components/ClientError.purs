@@ -66,6 +66,10 @@ component = H.mkComponent
   renderErrorMessage ::  ApplicationError -> String
   renderErrorMessage error =
     case error of
+      NoSocket ->
+        """
+        No socket connection. Please try reloading the page.
+        """
       NoSynths ->
         """
         No synths were found. Check that schisma is installed and accessible

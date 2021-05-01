@@ -3,19 +3,17 @@ module State.Global where
 import Prelude
 
 import Control.Monad.Reader (class MonadAsk)
-import Data.Array ((!!), (:), filter, length, mapWithIndex, sortWith, updateAt)
+import Data.Array ((:), filter, length, mapWithIndex, sortWith)
 import Data.Array.NonEmpty (NonEmptyArray)
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Tuple (Tuple(..))
+import Data.Maybe (Maybe)
 import Effect.Aff.Class (class MonadAff)
 
 import Data.Instrument (Instrument)
 import Data.Synth (Synth)
-import Data.Track (Track, toInstrument)
+import Data.Track (Track)
 import Data.Utilities (modifyIfFound)
-import Env (GlobalEnvironment, GlobalState)
+import Env (GlobalEnvironment)
 import State.Store (getGlobalState, updateGlobalState)
-import ThirdParty.Socket (Socket)
 
 addInstrument
   :: forall m r
@@ -36,16 +34,6 @@ addInstrument instrument = do
                           , ids { lastInstrumentId = id }
                           }
   updateGlobalState state
-
-getSelectedTrackAndInstrument
-  :: GlobalState
-  -> Tuple (Maybe Track) (Maybe Instrument)
-getSelectedTrackAndInstrument globalState =
-  let trackIndex = fromMaybe (-1) globalState.selectedTrackIndex
-      maybeTrack = globalState.tracks !! trackIndex
-  in  case maybeTrack of
-        Nothing -> Tuple Nothing Nothing
-        Just track -> Tuple maybeTrack (toInstrument track globalState.instruments)
 
 removeInstrument
   :: forall m r
@@ -118,28 +106,6 @@ setInstrumentsFile file = do
   let state = globalState { instrumentsFile = file }
   updateGlobalState state
 
-setSelectedTrackIndex
-  :: forall m r
-   . MonadAff m
-  => MonadAsk { globalEnvironment :: GlobalEnvironment | r } m
-  => Maybe Int
-  -> m Unit
-setSelectedTrackIndex selectedTrackIndex = do
-  globalState <- getGlobalState
-  let state = globalState { selectedTrackIndex = selectedTrackIndex }
-  updateGlobalState state
-
-setSocket
-  :: forall m r
-   . MonadAff m
-  => MonadAsk { globalEnvironment :: GlobalEnvironment | r } m
-  => Maybe Socket
-  -> m Unit
-setSocket socket = do
-  globalState <- getGlobalState
-  let state = globalState { socket = socket }
-  updateGlobalState state
-
 setTrackerFile
   :: forall m r
    . MonadAff m
@@ -161,21 +127,3 @@ setTracks tracks = do
   globalState <- getGlobalState
   let state = globalState { tracks = tracks }
   updateGlobalState state
-
-updateSelectedTrack
-  :: forall m r
-   . MonadAff m
-  => MonadAsk { globalEnvironment :: GlobalEnvironment | r } m
-  => Track
-  -> m Unit
-updateSelectedTrack track = do
-  globalState <- getGlobalState
-
-  case globalState.selectedTrackIndex of
-    Nothing -> pure unit
-    Just index ->
-      case updateAt index track globalState.tracks of
-        Nothing -> pure unit
-        Just tracks -> do
-          let state = globalState { tracks = tracks }
-          updateGlobalState state

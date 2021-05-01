@@ -1,7 +1,7 @@
 module Data.Instrument where
 
 import Prelude
-import Data.Array(catMaybes)
+import Data.Array (catMaybes)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray, find, head)
 import Data.Int (floor)

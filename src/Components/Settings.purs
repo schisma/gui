@@ -6,12 +6,12 @@ import Control.Monad.Reader (class MonadAsk)
 import Data.Array (sortWith)
 import Data.Array.NonEmpty (toArray)
 import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Record (merge)
 import Type.Proxy (Proxy(..))
 import Web.Event.Event (preventDefault)
 import Web.UIEvent.MouseEvent (MouseEvent, toEvent)
@@ -24,14 +24,11 @@ import Capabilities.Resources.Instrument ( class ManageInstrument
 import Capabilities.Resources.Midi (class ManageMidi)
 import Components.HigherOrder.Connect as Connect
 import Components.Instrument as Instrument
-import Components.Synth as Synth
 import Data.Component (OpaqueSlot)
 import Data.Instrument (Instrument)
 import Data.Synth (Synth)
-import Data.Track (Track(..))
-import Env (GlobalEnvironment, GlobalState)
+import Env (GlobalEnvironment)
 import State.Global ( addInstrument
-                    , getSelectedTrackAndInstrument
                     , setInstruments
                     , setInstrumentsFile
                     , setTrackerFile
@@ -39,21 +36,15 @@ import State.Global ( addInstrument
 
 type Slots
   = ( instrument :: OpaqueSlot Int
-    , synth :: OpaqueSlot Unit
     )
 
-data Panel
-  = Configuration
-  | SynthControls
-
-derive instance eqPanel :: Eq Panel
-
 type Input
-  = { | Connect.WithGlobalState () }
+  = { selectedInstrument :: Maybe Instrument
+    | Connect.WithGlobalState () }
 
 type State
-  = { displayedPanel :: Panel
-    , instrumentsFile :: String
+  = { instrumentsFile :: String
+    , selectedInstrument :: Maybe Instrument
     , trackerFile :: String
     | Connect.WithGlobalState ()
     }
@@ -62,10 +53,11 @@ data Action
   = AddInstrument MouseEvent
   | ChangeInstrumentsFile String
   | ChangeTrackerFile String
-  | ClickPanel Panel
   | LoadInstrumentsFromFile MouseEvent String
   | LoadTrackerFromFile MouseEvent String
-  | Receive { | Connect.WithGlobalState () }
+  | Receive { selectedInstrument :: Maybe Instrument
+            | Connect.WithGlobalState ()
+            }
 
 component
   :: forall q m r
@@ -77,11 +69,9 @@ component
   => H.Component q Input Void m
 component =
   H.mkComponent
-    { initialState: \{ globalState } ->
-      { displayedPanel: Configuration
-      , instrumentsFile: "~/code/compositions/proof/instruments2.json"
+    { initialState: merge
+      { instrumentsFile: "~/code/compositions/proof/instruments2.json"
       , trackerFile: "~/code/compositions/proof/tracker2.csv"
-      , globalState
       }
     , render
     , eval: H.mkEval $ H.defaultEval
@@ -109,9 +99,6 @@ component =
     ChangeTrackerFile file ->
       H.modify_ _ { trackerFile = file }
 
-    ClickPanel panel ->
-      H.modify_ _ { displayedPanel = panel }
-
     LoadInstrumentsFromFile mouseEvent file -> do
       H.liftEffect $ preventDefault (toEvent mouseEvent)
       setInstrumentsFile file
@@ -127,35 +114,10 @@ component =
       H.liftEffect $ preventDefault (toEvent mouseEvent)
       setTrackerFile file
 
-    Receive { globalState } ->
-      H.modify_ _ { globalState = globalState }
-
-  linkName :: Panel -> String
-  linkName panel = case panel of
-    Configuration -> "Configuration"
-    SynthControls -> "Synth Controls"
-
-  panelClasses :: State -> Panel -> Array HH.ClassName
-  panelClasses state panel =
-    let
-      classes =
-        if panel == state.displayedPanel then
-          [ "panel" ]
-        else
-          [ "panel", "hidden" ]
-    in
-      map HH.ClassName classes
-
-  panelLinkClasses :: State -> Panel -> Array HH.ClassName
-  panelLinkClasses state panel =
-    let
-      classes =
-        if panel == state.displayedPanel then
-          [ "nav-link", "active" ]
-        else
-          [ "nav-link" ]
-    in
-      map HH.ClassName classes
+    Receive { globalState, selectedInstrument } ->
+      H.modify_ _ { globalState = globalState
+                  , selectedInstrument = selectedInstrument
+                  }
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =
@@ -166,160 +128,139 @@ component =
 
       instruments = sortWith (_.number) state.globalState.instruments
 
-    in HH.div
-      [ HP.class_ (HH.ClassName "mt-2") ]
-      [ HH.div
-          [ HP.class_ (HH.ClassName "nav") ]
-          [ HH.ul
-              [ HP.class_ (HH.ClassName "flex") ]
-              [ renderPanelLink state Configuration
-              , renderPanelLink state SynthControls
-              ]
-          ]
-      , HH.div
-          [ HP.class_ (HH.ClassName "settings") ]
+    in  HH.div
+          [ HP.class_ (HH.ClassName "panel") ]
           [ HH.div
-              [ HP.classes (panelClasses state Configuration) ]
+              [ HP.class_ (HH.ClassName "flex") ]
               [ HH.div
-                  [ HP.class_ (HH.ClassName "flex") ]
-                  [ HH.div
-                      [ HP.classes (map HH.ClassName [ "overflow-y-auto"
-                                                     , "p-5"
-                                                     , "w-1/2"
-                                                     ])
-                      ]
-                      [ HH.h2
-                          [ HP.classes (map HH.ClassName [ "text-2xl"
-                                                         , "mb-4"
-                                                         ])
-                          ]
-                          [ HH.text "Files" ]
-                      , HH.div
-                          [ HP.class_ (HH.ClassName "mb-5") ]
-                          [ HH.form
-                              [ HP.class_ (HH.ClassName "mb-2") ]
-                              [ HH.label
-                                  [ HP.classes
-                                    (map HH.ClassName [ "flex"
-                                                      , "items-center"
+                  [ HP.classes (map HH.ClassName [ "overflow-y-auto"
+                                                  , "p-5"
+                                                  , "w-1/2"
+                                                  ])
+                  ]
+                  [ HH.h2
+                      [ HP.classes (map HH.ClassName [ "text-2xl"
+                                                      , "mb-4"
                                                       ])
-                                  ]
-                                  [ HH.span
-                                    [ HP.class_ (HH.ClassName "w-1/4") ]
-                                    [ HH.text "Instruments File" ]
-                                  , HH.div
-                                      [ HP.classes
-                                        (map HH.ClassName [ "flex", "w-3/4" ])
-                                      ]
-                                      [ HH.input
-                                          [ HP.classes
-                                            (map HH.ClassName [ "input"
-                                                              , "inline-flex"
-                                                              , "mr-2"
-                                                              ])
-                                          , HP.type_ HP.InputText
-                                          , HP.name "file"
-                                          , HP.value state.instrumentsFile
-                                          , HE.onValueChange
-                                            ChangeInstrumentsFile
-                                          ]
-                                      , HH.button
-                                          [ HP.classes
-                                            (map HH.ClassName [ "btn-white"
-                                                              , "btn-normal"
-                                                              ])
-                                          , HE.onClick \event ->
-                                              LoadInstrumentsFromFile
-                                              event
-                                              state.instrumentsFile
-                                          ]
-                                          [ HH.text "Load" ]
-                                      ]
-                                  ]
+                      ]
+                      [ HH.text "Files" ]
+                  , HH.div
+                      [ HP.class_ (HH.ClassName "mb-5") ]
+                      [ HH.form
+                          [ HP.class_ (HH.ClassName "mb-2") ]
+                          [ HH.label
+                              [ HP.classes
+                                (map HH.ClassName [ "flex"
+                                                  , "items-center"
+                                                  ])
                               ]
-                          , HH.form
-                              [ HP.class_ (HH.ClassName "mb-2") ]
-                              [ HH.label
+                              [ HH.span
+                                [ HP.class_ (HH.ClassName "w-1/4") ]
+                                [ HH.text "Instruments File" ]
+                              , HH.div
                                   [ HP.classes
-                                    (map HH.ClassName [ "flex"
-                                                      , "items-center"
-                                                      ])
+                                    (map HH.ClassName [ "flex", "w-3/4" ])
                                   ]
-                                  [ HH.span
-                                    [ HP.class_ (HH.ClassName "w-1/4") ]
-                                    [ HH.text "Tracker File" ]
-                                  , HH.div
+                                  [ HH.input
                                       [ HP.classes
-                                        (map HH.ClassName [ "flex", "w-3/4" ])
+                                        (map HH.ClassName [ "input"
+                                                          , "inline-flex"
+                                                          , "mr-2"
+                                                          ])
+                                      , HP.type_ HP.InputText
+                                      , HP.name "file"
+                                      , HP.value state.instrumentsFile
+                                      , HE.onValueChange
+                                        ChangeInstrumentsFile
                                       ]
-                                      [ HH.input
-                                          [ HP.classes
-                                            (map HH.ClassName [ "input"
-                                                              , "inline-flex"
-                                                              , "mr-2"
-                                                              ])
-                                          , HP.type_ HP.InputText
-                                          , HP.name "file"
-                                          , HP.value state.trackerFile
-                                          , HE.onValueChange ChangeTrackerFile
-                                          ]
-                                      , HH.button
-                                          [ HP.classes
-                                            (map HH.ClassName [ "btn-white"
-                                                              , "btn-normal"
-                                                              ])
-                                          , HE.onClick \event ->
-                                              LoadTrackerFromFile
-                                              event
-                                              state.trackerFile
-                                          ]
-                                          [ HH.text "Load" ]
-                                      ]
-                                  ]
-                              ]
-                          ]
-                      ]
-                  , HH.form
-                      [ HP.classes (map HH.ClassName [ "overflow-y-auto"
-                                                     , "p-5"
-                                                     , "w-1/2"
-                                                     ])
-                      ]
-                      [ HH.h2
-                          [ HP.class_ (HH.ClassName "text-2xl") ]
-                          [ HH.text "Instruments" ]
-                          , HH.div_ $
-                            map (renderInstrument synths) instruments
-                      , HH.div
-                          [ HP.class_ (HH.ClassName "mb-5") ]
-                          [ HH.div
-                              [ HP.class_ (HH.ClassName "flex") ]
-                              [ HH.div [ HP.class_ (HH.ClassName "w-1/4") ] []
-                              , HH.div [ HP.class_ (HH.ClassName "w-3/4") ]
-                                  [ HH.button
+                                  , HH.button
                                       [ HP.classes
-                                        (map HH.ClassName [ "btn-green"
+                                        (map HH.ClassName [ "btn-white"
                                                           , "btn-normal"
                                                           ])
                                       , HE.onClick \event ->
-                                          AddInstrument event
+                                          LoadInstrumentsFromFile
+                                          event
+                                          state.instrumentsFile
                                       ]
-                                      [ HH.text "Add Instrument" ]
+                                      [ HH.text "Load" ]
+                                  ]
+                              ]
+                          ]
+                      , HH.form
+                          [ HP.class_ (HH.ClassName "mb-2") ]
+                          [ HH.label
+                              [ HP.classes
+                                (map HH.ClassName [ "flex"
+                                                  , "items-center"
+                                                  ])
+                              ]
+                              [ HH.span
+                                [ HP.class_ (HH.ClassName "w-1/4") ]
+                                [ HH.text "Tracker File" ]
+                              , HH.div
+                                  [ HP.classes
+                                    (map HH.ClassName [ "flex", "w-3/4" ])
+                                  ]
+                                  [ HH.input
+                                      [ HP.classes
+                                        (map HH.ClassName [ "input"
+                                                          , "inline-flex"
+                                                          , "mr-2"
+                                                          ])
+                                      , HP.type_ HP.InputText
+                                      , HP.name "file"
+                                      , HP.value state.trackerFile
+                                      , HE.onValueChange ChangeTrackerFile
+                                      ]
+                                  , HH.button
+                                      [ HP.classes
+                                        (map HH.ClassName [ "btn-white"
+                                                          , "btn-normal"
+                                                          ])
+                                      , HE.onClick \event ->
+                                          LoadTrackerFromFile
+                                          event
+                                          state.trackerFile
+                                      ]
+                                      [ HH.text "Load" ]
                                   ]
                               ]
                           ]
                       ]
                   ]
-              ]
-          , HH.div
-              [ HP.classes (panelClasses state SynthControls)
-              ]
-              [ HH.div
-                  [ HP.class_ (HH.ClassName "synth-controls") ]
-                  (renderSynth state.globalState)
+              , HH.form
+                  [ HP.classes (map HH.ClassName [ "overflow-y-auto"
+                                                  , "p-5"
+                                                  , "w-1/2"
+                                                  ])
+                  ]
+                  [ HH.h2
+                      [ HP.class_ (HH.ClassName "text-2xl") ]
+                      [ HH.text "Instruments" ]
+                      , HH.div_ $
+                        map (renderInstrument synths) instruments
+                  , HH.div
+                      [ HP.class_ (HH.ClassName "mb-5") ]
+                      [ HH.div
+                          [ HP.class_ (HH.ClassName "flex") ]
+                          [ HH.div [ HP.class_ (HH.ClassName "w-1/4") ] []
+                          , HH.div [ HP.class_ (HH.ClassName "w-3/4") ]
+                              [ HH.button
+                                  [ HP.classes
+                                    (map HH.ClassName [ "btn-green"
+                                                      , "btn-normal"
+                                                      ])
+                                  , HE.onClick \event ->
+                                      AddInstrument event
+                                  ]
+                                  [ HH.text "Add Instrument" ]
+                              ]
+                          ]
+                      ]
+                  ]
               ]
           ]
-      ]
 
   renderInstrument
     :: Array Synth
@@ -332,40 +273,3 @@ component =
       Instrument.component
       { synths, instrument }
       absurd
-
-  renderPanelLink :: State -> Panel -> H.ComponentHTML Action Slots m
-  renderPanelLink state panel =
-    HH.li
-      [ HP.classes (map HH.ClassName [ "flex-1", "mr-2" ])
-      , HE.onClick \_ -> ClickPanel panel
-      ]
-      [ HH.a
-          [ HP.classes $ panelLinkClasses state panel
-          , HP.href "#"
-          ]
-          [ HH.text $ linkName panel ]
-      ]
-
-  renderSynth :: GlobalState -> Array (H.ComponentHTML Action Slots m)
-  renderSynth globalState =
-    let Tuple maybeTrack maybeInstrument =
-          getSelectedTrackAndInstrument globalState
-
-    in  case maybeTrack of
-          Nothing -> []
-          Just track ->
-            case track of
-              MasterTrack -> []
-              LineNumberTrack -> []
-              InstrumentTrack _ -> case maybeInstrument of
-                Nothing -> []
-                Just instrument ->
-                  [ HH.slot
-                      (Proxy :: _ "synth")
-                      unit
-                      Synth.component
-                      { selectedInstrument: instrument
-                      , socket: globalState.socket
-                      }
-                      absurd
-                  ]

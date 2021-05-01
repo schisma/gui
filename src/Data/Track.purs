@@ -32,6 +32,7 @@ data Track
     , solo :: Boolean
     }
 
+derive instance ordTrack :: Ord Track
 derive instance eqTrack :: Eq Track
 
 data TrackHeader
@@ -56,14 +57,14 @@ toCsvName instruments track = case track of
           if instrumentTrack.mute then "M"
           else if instrumentTrack.solo then "S"
           else ""
-        maybeInstrument = toInstrument track instruments
+        maybeInstrument = toInstrument instruments track
         instrumentNumber = case maybeInstrument of
                              Nothing -> "0"
                              Just instrument -> show instrument.number
      in  prefix <> "I" <> instrumentNumber <> " " <> instrumentTrack.name
 
-toInstrument :: Track -> Array Instrument -> Maybe Instrument
-toInstrument track instruments =
+toInstrument :: Array Instrument -> Track -> Maybe Instrument
+toInstrument instruments track =
   case track of
     InstrumentTrack instrumentTrack ->
       find

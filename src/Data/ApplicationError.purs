@@ -7,7 +7,8 @@ import Data.Maybe (Maybe(..))
 import Data.Show.Generic (genericShow)
 
 data ApplicationError
-  = NoSynths
+  = NoSocket
+  | NoSynths
 
 derive instance eqApplicationError :: Eq ApplicationError
 derive instance ordApplicationError :: Ord ApplicationError
@@ -17,6 +18,7 @@ instance showApplicationError :: Show ApplicationError where
   show = genericShow
 
 parse :: String -> Maybe ApplicationError
+parse "NoSocket" = Just NoSocket
 parse "NoSynths" = Just NoSynths
 parse _ = Nothing
 

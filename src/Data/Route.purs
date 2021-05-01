@@ -10,9 +10,6 @@ import Routing.Duplex.Generic.Syntax ((/))
 import Data.ApplicationError (ApplicationError)
 import Data.ApplicationError as ApplicationError
 
-data Error
-  = NoSynths
-
 data Route
   = ClientError ApplicationError
   | Home

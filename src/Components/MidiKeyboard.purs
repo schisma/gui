@@ -3,10 +3,8 @@ module Components.MidiKeyboard where
 import Prelude
 
 import Control.Monad.Reader (class MonadAsk)
-import Data.Array (elem)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse_)
-import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -15,28 +13,23 @@ import Halogen.Subscription as HS
 import Web.HTML.HTMLElement (focus)
 
 import Capabilities.LogMessage (class LogMessage)
-import Capabilities.Resources.Midi (class ManageMidi, sendMidiMessage)
-import Components.HigherOrder.Connect as Connect
-import Data.Midi (allowedCommands, midiMessage)
+import Capabilities.Resources.Midi (class ManageMidi)
 import Env (GlobalEnvironment)
-import State.Global (getSelectedTrackAndInstrument)
 import ThirdParty.MidiKeyboard (MidiKeyboardMessage, midiKeyboard)
 
 type Slots :: forall k. Row k
 type Slots = ()
 
-type Input
-  = { | Connect.WithGlobalState ()
-    }
+type Input = {}
 
-type State
-  = { | Connect.WithGlobalState ()
-    }
+type State = {}
 
 data Action
   = ForwardMessage MidiKeyboardMessage
   | Initialize
-  | Receive { | Connect.WithGlobalState () }
+
+data Output
+  = ForwardedMessage MidiKeyboardMessage
 
 data Query a
   = Focus a
@@ -47,7 +40,7 @@ component
   => LogMessage m
   => MonadAsk { globalEnvironment :: GlobalEnvironment | r } m
   => ManageMidi m
-  => H.Component Query Input Void m
+  => H.Component Query Input Output m
 component =
   H.mkComponent
     { initialState: identity
@@ -56,37 +49,15 @@ component =
       { handleAction = handleAction
       , handleQuery = handleQuery
       , initialize = Just Initialize
-      , receive = Just <<< Receive
       }
     }
   where
 
-  handleAction :: Action -> H.HalogenM State Action Slots Void m Unit
+  handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
-    ForwardMessage message -> do
-      when (elem message.command allowedCommands) do
-        globalState <- H.gets _.globalState
-
-        let Tuple _ maybeInstrument = getSelectedTrackAndInstrument globalState
-
-        case maybeInstrument of
-          Nothing -> pure unit
-          Just instrument -> when (instrument.midiChannel > 0)
-            case globalState.socket of
-              Nothing -> pure unit
-              Just socket ->
-                  let formattedMessage =
-                        midiMessage
-                        message.command
-                        message.noteNumber
-                        message.value
-                        instrument.midiChannel
-
-                  in  sendMidiMessage socket formattedMessage
+    ForwardMessage message -> H.raise (ForwardedMessage message)
 
     Initialize -> do
-      state <- H.get
-
       { emitter, listener } <- H.liftEffect HS.create
       void $ H.subscribe emitter
 
@@ -95,12 +66,9 @@ component =
       H.getHTMLElementRef (H.RefLabel "midi-keyboard") >>= traverse_ \element ->
         H.liftEffect $ midiKeyboard element callback
 
-    Receive { globalState } -> do
-       H.modify_ _ { globalState = globalState }
-
   handleQuery
     :: forall a. Query a
-    -> H.HalogenM State Action Slots Void m (Maybe a)
+    -> H.HalogenM State Action Slots Output m (Maybe a)
   handleQuery = case _ of
     Focus a -> do
       H.getHTMLElementRef (H.RefLabel "midi-keyboard") >>= traverse_ \element ->

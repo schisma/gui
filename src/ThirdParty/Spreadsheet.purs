@@ -16,7 +16,7 @@ type Callbacks
     , onMute :: Spreadsheet -> Effect Unit
     , onPlay :: Spreadsheet -> Effect Unit
     , onPlayOnlyMidi :: Spreadsheet -> Effect Unit
-    , onSelection :: Spreadsheet -> Int -> Effect Unit
+    , onSelection :: Spreadsheet -> Array Int -> Effect Unit
     , onSolo :: Spreadsheet -> Effect Unit
     , onStop :: Spreadsheet -> Effect Unit
     }

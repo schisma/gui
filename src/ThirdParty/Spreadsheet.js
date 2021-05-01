@@ -69,11 +69,22 @@ class Spreadsheet {
   }
 
   _afterSelection(row, column, row2, column2) {
-    if (column != column2 || column == 0 || column == 1) {
-      return false;
-    }
+    const selectedColumns = this.spreadsheet.getSelected();
+    const columns = selectedColumns.flatMap(function(selection) {
+      let startRow, startCol, endRow, endCol;
+      [startRow, startCol, endRow, endCol] = selection;
 
-    this.callbacks.onSelection(this)(column)();
+      const sorted = [startCol, endCol].sort((a, b) => a - b);
+      [startCol, endCol] = sorted;
+
+      return Array.from({
+        length: endCol - startCol + 1
+      }, (_, i) => i + startCol);
+    });
+
+    const uniqueColumns = [...new Set(columns)].sort((a, b) => a - b);
+
+    this.callbacks.onSelection(this)(uniqueColumns)();
   }
 
   blur() {

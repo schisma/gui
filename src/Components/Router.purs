@@ -9,7 +9,7 @@ import Effect.Aff.Class (class MonadAff)
 import Halogen (liftEffect)
 import Halogen as H
 import Halogen.HTML as HH
-import Record as Record
+import Record (merge)
 import Routing.Duplex (parse)
 import Routing.Hash (getHash)
 import Type.Proxy (Proxy(..))
@@ -27,11 +27,12 @@ import Data.ApplicationError (ApplicationError(..))
 import Data.Component (OpaqueSlot)
 import Data.Route (Route(..), routeCodec)
 import Env (GlobalEnvironment)
-import State.Global (populateSynths, setSocket)
-import ThirdParty.Socket (createSocket)
+import State.Global (populateSynths)
+import ThirdParty.Socket (Socket, createSocket)
 
 type State =
   { route :: Maybe Route
+  , maybeSocket :: Maybe Socket
   | Connect.WithGlobalState ()
   }
 
@@ -59,7 +60,7 @@ component
   => Navigate m
   => H.Component Query {} Void m
 component = Connect.component $ H.mkComponent
-  { initialState: Record.insert (Proxy :: _ "route") Nothing
+  { initialState: merge { maybeSocket: Nothing, route: Nothing }
   , render
   , eval: H.mkEval $ H.defaultEval
       { handleAction = handleAction
@@ -74,7 +75,7 @@ component = Connect.component $ H.mkComponent
   handleAction = case _ of
     Initialize -> do
       socket <- liftEffect $ createSocket 8888
-      setSocket $ Just socket
+      H.modify_ _ { maybeSocket = Just socket }
 
       synths <- getSynths
       populateSynths synths
@@ -99,32 +100,41 @@ component = Connect.component $ H.mkComponent
       pure (Just a)
 
   render :: State -> H.ComponentHTML Action ChildSlots m
-  render { route, globalState } =
-    case globalState.synths of
+  render { route, maybeSocket, globalState } =
+    case maybeSocket of
       Nothing ->
         HH.slot
           (Proxy :: _ "clientError")
           unit
           ClientError.component
-          { error: NoSynths }
+          { error: NoSocket }
           absurd
-
-      _ -> case route of
-        Nothing -> HH.div_ [ HH.text "Page Not Found" ]
-
-        Just r -> case r of
-          Home ->
-            HH.slot
-              (Proxy :: _ "home")
-              unit
-              Home.component
-              { globalState }
-              absurd
-
-          ClientError error ->
+      Just socket ->
+        case globalState.synths of
+          Nothing ->
             HH.slot
               (Proxy :: _ "clientError")
               unit
               ClientError.component
-              { error }
+              { error: NoSynths }
               absurd
+
+          _ -> case route of
+            Nothing -> HH.div_ [ HH.text "Page Not Found" ]
+
+            Just r -> case r of
+              Home ->
+                HH.slot
+                  (Proxy :: _ "home")
+                  unit
+                  Home.component
+                  { globalState, socket }
+                  absurd
+
+              ClientError error ->
+                HH.slot
+                  (Proxy :: _ "clientError")
+                  unit
+                  ClientError.component
+                  { error }
+                  absurd

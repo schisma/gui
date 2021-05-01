@@ -10,7 +10,6 @@ import Data.Endpoint (BaseURL)
 import Data.Instrument (Instrument)
 import Data.Synth (Synth)
 import Data.Track (Track)
-import ThirdParty.Socket (Socket)
 
 type Ids
   = { lastInstrumentId :: Int
@@ -20,8 +19,6 @@ type GlobalState
   = { ids :: Ids
     , instruments :: Array Instrument
     , instrumentsFile :: String
-    , selectedTrackIndex :: Maybe Int
-    , socket :: Maybe Socket
     , synths :: Maybe (NonEmptyArray Synth)
     , trackerFile :: String
     , tracks :: Array Track

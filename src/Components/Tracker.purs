@@ -5,8 +5,6 @@ import Control.Monad.Reader (class MonadAsk)
 import Data.Array (tail)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Traversable (traverse_)
-import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -16,10 +14,7 @@ import Record as Record
 import Type.Proxy (Proxy(..))
 
 import Capabilities.LogMessage (class LogMessage)
-import Capabilities.Resources.Midi ( class ManageMidi
-                                   , sendMidiChannel
-                                   , sendMidiMessage
-                                   )
+import Capabilities.Resources.Midi (class ManageMidi)
 import Capabilities.Resources.Tracker ( class ManageTracker
                                       , getTrackerDataFromFile
                                       , play
@@ -27,19 +22,12 @@ import Capabilities.Resources.Tracker ( class ManageTracker
                                       , updateTrackerData
                                       )
 import Components.HigherOrder.Connect as Connect
-import Data.Instrument (midiControlChangeMessages)
 import Data.Track ( fromTrackerData
-                  , toggleMute
-                  , toggleSolo
                   , toCsvName
                   , toName
                   )
 import Env (GlobalEnvironment)
-import State.Global ( getSelectedTrackAndInstrument
-                    , setSelectedTrackIndex
-                    , setTracks
-                    , updateSelectedTrack
-                    )
+import State.Global (setTracks)
 import ThirdParty.Papaparse (unparse)
 import ThirdParty.Spreadsheet ( Spreadsheet
                               , exportAsCsv
@@ -68,9 +56,7 @@ data Action
   | PlayOnlyMidi Spreadsheet
   | PlayTracker Spreadsheet
   | Receive { | Connect.WithGlobalState () }
-  | SelectColumn Spreadsheet Int
-  | SendMidiChannel
-  | SendSelectedSynthParametersAsMidiCCMessages
+  | SelectColumn Spreadsheet (Array Int)
   | StopTracker
   | ToggleMuteSelectedTrack
   | ToggleSoloSelectedTrack
@@ -78,6 +64,10 @@ data Action
 
 data Output
   = Blurred
+  | Played
+  | SelectedColumns (Array Int)
+  | ToggledMute
+  | ToggledSolo
 
 component
   :: forall q m r
@@ -122,8 +112,8 @@ component =
                           HS.notify listener (PlayTracker sheet)
                       , onPlayOnlyMidi: \sheet ->
                           HS.notify listener (PlayOnlyMidi sheet)
-                      , onSelection: \sheet column ->
-                          HS.notify listener (SelectColumn sheet column)
+                      , onSelection: \sheet columns ->
+                          HS.notify listener (SelectColumn sheet columns)
                       , onSolo: \sheet ->
                           HS.notify listener ToggleSoloSelectedTrack
                       , onStop: \sheet ->
@@ -145,8 +135,7 @@ component =
       case result of
         -- TODO: Some kind of error message
         Left error -> pure unit
-        Right response ->
-          handleAction SendSelectedSynthParametersAsMidiCCMessages
+        Right response -> H.raise Played
 
     PlayOnlyMidi sheet -> handleAction (Play (-1) (-1))
 
@@ -184,56 +173,14 @@ component =
 
             H.modify_ _ { tracker = Just tracker'' }
 
-    SelectColumn sheet column -> do
-      setSelectedTrackIndex $ Just column
-      handleAction SendMidiChannel
-      handleAction SendSelectedSynthParametersAsMidiCCMessages
-
-    SendMidiChannel -> do
-      globalState <- H.gets _.globalState
-
-      let Tuple _ maybeInstrument = getSelectedTrackAndInstrument globalState
-
-      case maybeInstrument of
-        Nothing -> pure unit
-        Just instrument -> when (instrument.midiChannel > 0)
-          case globalState.socket of
-            Nothing -> pure unit
-            Just socket -> sendMidiChannel socket instrument.midiChannel
-
-    SendSelectedSynthParametersAsMidiCCMessages -> do
-      globalState <- H.gets _.globalState
-
-      let Tuple _ maybeInstrument = getSelectedTrackAndInstrument globalState
-
-      case maybeInstrument of
-        Nothing -> pure unit
-        Just instrument -> when (instrument.midiChannel > 0)
-          case globalState.socket of
-            Nothing -> pure unit
-            Just socket -> do
-              let midiMessages = midiControlChangeMessages instrument
-              traverse_ (sendMidiMessage socket) midiMessages
+    SelectColumn sheet columns -> do
+       H.raise (SelectedColumns columns)
 
     ToggleMuteSelectedTrack -> do
-      globalState <- H.gets _.globalState
-
-      let Tuple maybeTrack _ = getSelectedTrackAndInstrument globalState
-
-      case maybeTrack of
-        Nothing -> pure unit
-        Just track ->
-          updateSelectedTrack (toggleMute track)
+       H.raise ToggledMute
 
     ToggleSoloSelectedTrack -> do
-      globalState <- H.gets _.globalState
-
-      let Tuple maybeTrack _ = getSelectedTrackAndInstrument globalState
-
-      case maybeTrack of
-        Nothing -> pure unit
-        Just track ->
-          updateSelectedTrack (toggleSolo track)
+       H.raise ToggledSolo
 
     StopTracker -> stop
 

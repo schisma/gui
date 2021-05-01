@@ -26,8 +26,6 @@ initialGlobalState =
   { ids: { lastInstrumentId: 0 }
   , instruments: []
   , instrumentsFile: ""
-  , selectedTrackIndex: Nothing
-  , socket: Nothing
   , synths: Nothing
   , trackerFile: ""
   , tracks: []
