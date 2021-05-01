@@ -19,15 +19,15 @@ import Components.Dial as Dial
 import Components.Radio as Radio
 import Components.Slider as Slider
 import Components.Toggle as Toggle
+import Data.Component (SynthControlOutput)
 import Data.Instrument (Instrument)
-import Data.Synth (SynthParameter)
 import Env (GlobalEnvironment)
 
 type Slots
-  = ( dial :: H.Slot (Const Void) Dial.Output (Tuple Int String)
-    , radio :: H.Slot (Const Void) Radio.Output (Tuple Int String)
-    , slider :: H.Slot (Const Void) Slider.Output (Tuple Int String)
-    , toggle :: H.Slot (Const Void) Toggle.Output (Tuple Int String)
+  = ( dial :: H.Slot (Const Void) SynthControlOutput (Tuple Int String)
+    , radio :: H.Slot (Const Void) SynthControlOutput (Tuple Int String)
+    , slider :: H.Slot (Const Void) SynthControlOutput (Tuple Int String)
+    , toggle :: H.Slot (Const Void) SynthControlOutput (Tuple Int String)
     )
 
 type Input
@@ -39,14 +39,8 @@ type State
     }
 
 data Action
-  = HandleDial Dial.Output
-  | HandleRadio Radio.Output
-  | HandleSlider Slider.Output
-  | HandleToggle Toggle.Output
+  = HandleSynthControl SynthControlOutput
   | Receive { selectedInstrument :: Instrument }
-
-data Output
-  = UpdatedSynthParameter SynthParameter Instrument
 
 component
   :: forall q m r
@@ -54,7 +48,7 @@ component
   => LogMessage m
   => MonadAsk { globalEnvironment :: GlobalEnvironment | r } m
   => ManageMidi m
-  => H.Component q Input Output m
+  => H.Component q Input SynthControlOutput m
 component =
   H.mkComponent
     { initialState: identity
@@ -66,27 +60,9 @@ component =
     }
   where
 
-  handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
+  handleAction :: Action -> H.HalogenM State Action Slots SynthControlOutput m Unit
   handleAction = case _ of
-    HandleDial output ->
-      case output of
-        Dial.UpdatedSynthParameter synthParameter instrument ->
-          H.raise (UpdatedSynthParameter synthParameter instrument)
-
-    HandleRadio output ->
-      case output of
-        Radio.UpdatedSynthParameter synthParameter instrument ->
-          H.raise (UpdatedSynthParameter synthParameter instrument)
-
-    HandleSlider output ->
-      case output of
-        Slider.UpdatedSynthParameter synthParameter instrument ->
-          H.raise (UpdatedSynthParameter synthParameter instrument)
-
-    HandleToggle output ->
-      case output of
-        Toggle.UpdatedSynthParameter synthParameter instrument ->
-          H.raise (UpdatedSynthParameter synthParameter instrument)
+    HandleSynthControl output -> H.raise output
 
     Receive { selectedInstrument} -> do
       H.modify_ _ { selectedInstrument = selectedInstrument }
@@ -113,7 +89,7 @@ component =
               , size: 50
               , synthParameter
               }
-              HandleDial
+              HandleSynthControl
           ]
         Nothing -> []
 
@@ -138,7 +114,7 @@ component =
               , size: [180, 30]
               , synthParameter
               }
-              HandleRadio
+              HandleSynthControl
           ]
         Nothing -> []
 
@@ -164,7 +140,7 @@ component =
               , size: [20, 75]
               , synthParameter
               }
-              HandleSlider
+              HandleSynthControl
           ]
         Nothing -> []
 
@@ -189,7 +165,7 @@ component =
               , size: 20
               , synthParameter
               }
-              HandleToggle
+              HandleSynthControl
           ]
         Nothing -> []
 

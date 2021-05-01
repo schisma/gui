@@ -16,11 +16,11 @@ import Capabilities.Resources.Instrument (class ManageInstrument)
 import Capabilities.Resources.Midi (class ManageMidi)
 import Data.Instrument (Instrument)
 import Components.Synths.Profit as Profit
-import Data.Synth (SynthParameter)
+import Data.Component (SynthControlOutput)
 import Env (GlobalEnvironment)
 
 type Slots
-  = ( profit :: H.Slot (Const Void) Profit.Output Unit
+  = ( profit :: H.Slot (Const Void) SynthControlOutput Unit
     )
 
 type Input
@@ -32,12 +32,9 @@ type State
     }
 
 data Action
-  = Receive { selectedInstrument :: Instrument
+  = HandleSynth SynthControlOutput
+  | Receive { selectedInstrument :: Instrument
             }
-  | HandleProfit Profit.Output
-
-data Output
-  = UpdatedSynthParameter SynthParameter Instrument
 
 component
   :: forall q m r
@@ -46,7 +43,7 @@ component
   => MonadAsk { globalEnvironment :: GlobalEnvironment | r } m
   => ManageInstrument m
   => ManageMidi m
-  => H.Component q Input Output m
+  => H.Component q Input SynthControlOutput m
 component =
   H.mkComponent
     { initialState: identity
@@ -58,12 +55,9 @@ component =
     }
   where
 
-  handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
+  handleAction :: Action -> H.HalogenM State Action Slots SynthControlOutput m Unit
   handleAction = case _ of
-    HandleProfit output ->
-      case output of
-        Profit.UpdatedSynthParameter synthParameter instrument ->
-          H.raise (UpdatedSynthParameter synthParameter instrument)
+    HandleSynth output -> H.raise output
 
     Receive { selectedInstrument } ->
       H.modify_ _ { selectedInstrument = selectedInstrument }
@@ -81,7 +75,7 @@ component =
                 unit
                 Profit.component
                 { selectedInstrument }
-                HandleProfit
+                HandleSynth
               ]
 
           _ -> HH.div_ []

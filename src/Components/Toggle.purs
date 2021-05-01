@@ -13,6 +13,7 @@ import Record (merge)
 
 import Capabilities.LogMessage (class LogMessage)
 import Capabilities.Resources.Midi (class ManageMidi)
+import Data.Component (SynthControlOutput(..))
 import Data.Instrument (Instrument, updateSynthParameterValue)
 import Data.Synth (SynthParameter)
 import Env (GlobalEnvironment)
@@ -46,16 +47,13 @@ data Action
             , synthParameter :: SynthParameter
             }
 
-data Output
-  = UpdatedSynthParameter SynthParameter Instrument
-
 component
   :: forall q m r
    . MonadAff m
   => LogMessage m
   => MonadAsk { globalEnvironment :: GlobalEnvironment | r } m
   => ManageMidi m
-  => H.Component q Input Output m
+  => H.Component q Input SynthControlOutput m
 component =
   H.mkComponent
     { initialState: merge { toggle: Nothing }
@@ -68,7 +66,7 @@ component =
     }
   where
 
-  handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
+  handleAction :: Action -> H.HalogenM State Action Slots SynthControlOutput m Unit
   handleAction = case _ of
     HandleToggle toggleState -> do
       state <- H.get

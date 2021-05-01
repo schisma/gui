@@ -27,7 +27,7 @@ import Components.MidiKeyboard as MidiKeyboard
 import Components.Settings as Settings
 import Components.Synth as Synth
 import Components.Tracker as Tracker
-import Data.Component (OpaqueSlot)
+import Data.Component (OpaqueSlot, SynthControlOutput(..))
 import Data.Instrument ( Instrument
                        , midiControlChangeMessage
                        , midiControlChangeMessages
@@ -41,7 +41,7 @@ import ThirdParty.Socket (Socket)
 type Slots
   = ( midiKeyboard :: H.Slot MidiKeyboard.Query MidiKeyboard.Output Unit
     , settings :: OpaqueSlot Unit
-    , synth :: H.Slot (Const Void) Synth.Output Unit
+    , synth :: H.Slot (Const Void) SynthControlOutput Unit
     , tracker :: H.Slot (Const Void) Tracker.Output Unit
     )
 
@@ -60,7 +60,7 @@ type State
 data Action
   = ChangePanel Panel
   | HandleMidiKeyboard MidiKeyboard.Output
-  | HandleSynth Synth.Output
+  | HandleSynth SynthControlOutput
   | HandleTracker Tracker.Output
   | Receive { socket :: Socket
             | Connect.WithGlobalState ()
@@ -121,7 +121,7 @@ component = H.mkComponent
 
     HandleSynth output ->
       case output of
-        Synth.UpdatedSynthParameter synthParameter instrument ->
+        UpdatedSynthParameter synthParameter instrument ->
           when (instrument.midiChannel > 0) do
             state <- H.get
 
