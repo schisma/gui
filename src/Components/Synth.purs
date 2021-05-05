@@ -16,11 +16,13 @@ import Capabilities.Resources.Instrument (class ManageInstrument)
 import Capabilities.Resources.Midi (class ManageMidi)
 import Data.Instrument (Instrument)
 import Components.Synths.Profit as Profit
+import Components.Synths.SoundFont as SoundFont
 import Data.Component (SynthControlOutput)
 import Env (GlobalEnvironment)
 
 type Slots
   = ( profit :: H.Slot (Const Void) SynthControlOutput Unit
+    , soundFont :: H.Slot (Const Void) SynthControlOutput Unit
     )
 
 type Input
@@ -74,6 +76,17 @@ component =
                 (Proxy :: _ "profit")
                 unit
                 Profit.component
+                { selectedInstrument }
+                HandleSynth
+              ]
+
+          "SoundFont" ->
+            HH.div
+              [ HP.class_ (HH.ClassName "panel") ]
+              [ HH.slot
+                (Proxy :: _ "soundFont")
+                unit
+                SoundFont.component
                 { selectedInstrument }
                 HandleSynth
               ]
