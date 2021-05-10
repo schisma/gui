@@ -8,6 +8,7 @@ import Data.Array ( (!!)
                   , catMaybes
                   , elem
                   , head
+                  , insertAt
                   , length
                   , modifyAtIndices
                   , nub
@@ -56,12 +57,13 @@ import Data.Midi (allowedCommands, midiMessage)
 import Data.Synth (Synth)
 import Data.Track ( Track
                   , fromTrackerData
+                  , newInstrumentTrack
                   , toggleMute
                   , toggleSolo
                   , toCsvName
                   , toInstrument
                   )
-import Data.Utilities (modifyIfFound)
+import Data.Utilities (deleteAtIndices, modifyIfFound)
 import Env (GlobalEnvironment)
 import ThirdParty.Papaparse (unparse)
 import ThirdParty.Socket (Socket)
@@ -101,7 +103,7 @@ data Action
   | SendMidiChannel
   | SendSelectedSynthParametersAsMidiCCMessages
   | UpdateInstrument Instrument
-  | UpdateTrackerData String
+  | UpdateTrackerData
 
 data Panel
   = Configuration
@@ -219,6 +221,21 @@ component = H.mkComponent
 
     HandleTracker output ->
       case output of
+        Tracker.AddedColumn index -> do
+          state <- H.get
+
+          case head state.instruments of
+            Nothing -> pure unit
+            Just instrument ->
+              let track = newInstrumentTrack instrument
+                  maybeTracks = insertAt index track state.tracks
+
+              in  case maybeTracks of
+                Nothing -> pure unit
+                Just tracks -> do
+                  H.modify_ _ { tracks = tracks }
+                  handleAction UpdateTrackerData
+
         Tracker.Blurred ->
           H.tell (Proxy :: _ "midiKeyboard") unit MidiKeyboard.Focus
 
@@ -232,6 +249,11 @@ component = H.mkComponent
             Right response ->
               handleAction SendSelectedSynthParametersAsMidiCCMessages
 
+        Tracker.RemovedColumns columns -> do
+          state <- H.get
+          H.modify_ _ { tracks = deleteAtIndices columns state.tracks }
+          handleAction UpdateTrackerData
+
         Tracker.SelectedColumns columns -> do
           H.modify_ _ { selectedTrackIndices = columns }
 
@@ -241,7 +263,7 @@ component = H.mkComponent
         Tracker.Stopped ->
           stop
 
-        Tracker.ToggledMute trackerBody -> do
+        Tracker.ToggledMute -> do
           state <- H.get
 
           let tracks =
@@ -251,9 +273,9 @@ component = H.mkComponent
                 state.tracks
 
           H.modify_ _ { tracks = tracks }
-          handleAction (UpdateTrackerData trackerBody)
+          handleAction UpdateTrackerData
 
-        Tracker.ToggledSolo trackerBody -> do
+        Tracker.ToggledSolo -> do
           state <- H.get
 
           let tracks =
@@ -263,10 +285,10 @@ component = H.mkComponent
                 state.tracks
 
           H.modify_ _ { tracks = tracks }
-          handleAction (UpdateTrackerData trackerBody)
+          handleAction UpdateTrackerData
 
-        Tracker.UpdatedTrackerData trackerBody ->
-          handleAction (UpdateTrackerData trackerBody)
+        Tracker.UpdatedTrackerData ->
+          handleAction UpdateTrackerData
 
     Receive { socket, synths } ->
       H.modify_ _ { socket = socket
@@ -301,14 +323,20 @@ component = H.mkComponent
 
       H.modify_ _ { instruments = instruments }
 
-    UpdateTrackerData trackerBody -> do
-      state <- H.get
+    UpdateTrackerData -> do
+      let proxy = Proxy :: _ "tracker"
+      maybeTrackerBody <- H.request proxy unit Tracker.GetTrackerBody
 
-      let header = map (toCsvName state.instruments) state.tracks
-          trackerHeader = unparse [header]
-          contents = trackerHeader <> "\n" <> trackerBody
+      case maybeTrackerBody of
+        Nothing -> pure unit
+        Just trackerBody -> do
+          state <- H.get
 
-      updateTrackerData state.trackerFile contents
+          let header = map (toCsvName state.instruments) state.tracks
+              trackerHeader = unparse [header]
+              contents = trackerHeader <> "\n" <> trackerBody
+
+          updateTrackerData state.trackerFile contents
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =

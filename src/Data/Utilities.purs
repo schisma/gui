@@ -2,8 +2,15 @@ module Data.Utilities where
 
 import Prelude
 
-import Data.Array (findIndex, modifyAt)
+import Data.Array (filter, findIndex, length, modifyAt, notElem, range, zip)
 import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..), snd)
+
+deleteAtIndices :: forall a. Array Int -> Array a -> Array a
+deleteAtIndices indices xs =
+  let withIndices = zip (range 0 (length xs - 1)) xs
+      filtered = filter (\(Tuple index x) -> notElem index indices) withIndices
+  in  map snd filtered
 
 modifyIfFound :: forall a. (a -> Boolean) -> (a -> a) -> Array a -> Array a
 modifyIfFound f g xs =

@@ -33,29 +33,34 @@ type State
     }
 
 data Action
-  = Blur
+  = AddColumn Spreadsheet Int
+  | Blur
   | Initialize
   | Play Int Int
-  | PlayOnlyMidi Spreadsheet
+  | PlayOnlyMidi
   | PlayTracker Spreadsheet
   | Receive { tracks :: Array Track }
-  | SelectColumn Spreadsheet (Array Int)
+  | RemoveColumns Spreadsheet (Array Int)
+  | SelectColumns Spreadsheet (Array Int)
   | StopTracker
-  | ToggleMuteSelectedTrack Spreadsheet
-  | ToggleSoloSelectedTrack Spreadsheet
+  | ToggleMuteSelectedTracks Spreadsheet
+  | ToggleSoloSelectedTracks Spreadsheet
   | UpdateTrackerData Spreadsheet
 
 data Output
-  = Blurred
+  = AddedColumn Int
+  | Blurred
   | Played Int Int
+  | RemovedColumns (Array Int)
   | SelectedColumns (Array Int)
   | Stopped
-  | ToggledMute String
-  | ToggledSolo String
-  | UpdatedTrackerData String
+  | ToggledMute
+  | ToggledSolo
+  | UpdatedTrackerData
 
 data Query a
-  = UpdateRows (Array (Array String)) a
+  = GetTrackerBody (String -> a)
+  | UpdateRows (Array (Array String)) a
 
 component
   :: forall m r
@@ -80,6 +85,9 @@ component =
 
   handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
+    AddColumn sheet index -> do
+      H.raise (AddedColumn index)
+
     Blur -> do
       H.raise Blurred
 
@@ -89,22 +97,26 @@ component =
 
       let callbacks = { afterChange: \sheet ->
                           HS.notify listener (UpdateTrackerData sheet)
+                      , afterCreateCol: \sheet index ->
+                          HS.notify listener (AddColumn sheet index)
                       , afterCreateRow: \sheet ->
                           HS.notify listener (UpdateTrackerData sheet)
+                      , afterRemoveCol: \sheet columns ->
+                          HS.notify listener (RemoveColumns sheet columns)
                       , afterRemoveRow: \sheet ->
                           HS.notify listener (UpdateTrackerData sheet)
                       , onBlur: \sheet ->
                           HS.notify listener Blur
                       , onMute: \sheet ->
-                          HS.notify listener (ToggleMuteSelectedTrack sheet)
+                          HS.notify listener (ToggleMuteSelectedTracks sheet)
                       , onPlay: \sheet ->
                           HS.notify listener (PlayTracker sheet)
                       , onPlayOnlyMidi: \sheet ->
-                          HS.notify listener (PlayOnlyMidi sheet)
+                          HS.notify listener PlayOnlyMidi
                       , onSelection: \sheet columns ->
-                          HS.notify listener (SelectColumn sheet columns)
+                          HS.notify listener (SelectColumns sheet columns)
                       , onSolo: \sheet ->
-                          HS.notify listener (ToggleSoloSelectedTrack sheet)
+                          HS.notify listener (ToggleSoloSelectedTracks sheet)
                       , onStop: \sheet ->
                           HS.notify listener StopTracker
                       }
@@ -115,7 +127,7 @@ component =
     Play start end ->
       H.raise (Played start end)
 
-    PlayOnlyMidi sheet ->
+    PlayOnlyMidi ->
       handleAction (Play (-1) (-1))
 
     PlayTracker sheet ->
@@ -130,36 +142,45 @@ component =
         Just tracker -> do
           let headers = map toName tracks
 
-          tracker' <- H.liftEffect $ updateHeaders tracker headers
-          H.modify_ _ { tracker = Just tracker' }
+          void $ H.liftEffect $ updateHeaders tracker headers
 
-    SelectColumn sheet columns -> do
-       H.raise (SelectedColumns columns)
+    RemoveColumns sheet columns -> do
+      H.raise (RemovedColumns columns)
 
-    ToggleMuteSelectedTrack sheet -> do
-       H.raise (ToggledMute $ exportAsCsv sheet)
+    SelectColumns sheet columns -> do
+      H.raise (SelectedColumns columns)
 
-    ToggleSoloSelectedTrack sheet -> do
-       H.raise (ToggledSolo $ exportAsCsv sheet)
+    ToggleMuteSelectedTracks sheet -> do
+       H.raise ToggledMute
+
+    ToggleSoloSelectedTracks sheet -> do
+       H.raise ToggledSolo
 
     StopTracker ->
       H.raise Stopped
 
     UpdateTrackerData sheet -> do
-      H.raise (UpdatedTrackerData $ exportAsCsv sheet)
+      H.raise UpdatedTrackerData
 
   handleQuery
     :: forall a. Query a
     -> H.HalogenM State Action Slots Output m (Maybe a)
   handleQuery = case _ of
+    GetTrackerBody reply -> do
+      maybeTracker <- H.gets _.tracker
+      case maybeTracker of
+        Nothing ->
+          pure Nothing
+        Just tracker ->
+          pure (Just (reply $ exportAsCsv tracker))
+
     UpdateRows rows a -> do
       state <- H.get
 
       case state.tracker of
         Nothing -> pure unit
-        Just tracker -> do
-          tracker' <- H.liftEffect $ updateData tracker rows
-          H.modify_ _ { tracker = Just tracker' }
+        Just tracker ->
+          void $ H.liftEffect $ updateData tracker rows
 
       pure (Just a)
 

@@ -51,6 +51,10 @@ class Spreadsheet {
     }
   }
 
+  _afterCreateCol(colIndex, amount, source) {
+    this.callbacks.afterCreateCol(this)(colIndex)();
+  }
+
   _afterCreateRow(rowIndex, amount, source) {
     if (source == 'ContextMenu.rowAbove') {
       this.renumberRows(rowIndex - 1);
@@ -58,6 +62,12 @@ class Spreadsheet {
     } else if (source == 'ContextMenu.rowBelow') {
       this.renumberRows(rowIndex);
       this.callbacks.afterCreateRow(this)();
+    }
+  }
+
+  _afterRemoveCol(columnIndex, amount, removedColumns, source) {
+    if (source == 'ContextMenu.removeColumn') {
+      this.callbacks.afterRemoveCol(this)(removedColumns)();
     }
   }
 
@@ -120,11 +130,33 @@ class Spreadsheet {
       afterChange: (changes, source) => {
         this._afterChange(changes, source);
       },
+      afterCreateCol: (colIndex, amount, source) => {
+        // NOTE: setTimeout is needed to allow Handsontable to "settle".
+        setTimeout(
+          () => this._afterCreateCol(colIndex, amount, source),
+          1
+        );
+      },
       afterCreateRow: (rowIndex, amount, source) => {
-        this._afterCreateRow(rowIndex, amount, source);
+        // NOTE: setTimeout is needed to allow Handsontable to "settle".
+        setTimeout(
+          () => this._afterCreateRow(rowIndex, amount, source),
+          1
+        );
+      },
+      afterRemoveCol: (columnIndex, amount, removedColumns, source) => {
+        // NOTE: setTimeout is needed to allow Handsontable to "settle".
+        setTimeout(
+          () => this._afterRemoveCol(columnIndex, amount, removedColumns, source),
+          1
+        );
       },
       afterRemoveRow: (rowIndex, amount, removedRows, source) => {
-        this._afterRemoveRow(rowIndex, amount, removedRows, source);
+        // NOTE: setTimeout is needed to allow Handsontable to "settle".
+        setTimeout(
+          () => this._afterRemoveRow(rowIndex, amount, removedRows, source),
+          1
+        );
       },
       afterSelection: (row, column, row2, column2) => {
         this._afterSelection(row, column, row2, column2);
@@ -251,10 +283,14 @@ class Spreadsheet {
 
   updateSpreadsheetData(rows) {
     this.spreadsheet.loadData(rows);
+
+    return this;
   }
 
   updateSpreadsheetHeaders(headers) {
     this.spreadsheet.updateSettings({ colHeaders: headers });
+
+    return this;
   }
 }
 
@@ -275,11 +311,9 @@ exports._spreadsheet = function(id, callbacks) {
 }
 
 exports._updateSpreadsheetHeaders = function(spreadsheet, headers) {
-  spreadsheet.updateSpreadsheetHeaders(headers);
-  return spreadsheet;
+  return spreadsheet.updateSpreadsheetHeaders(headers);
 }
 
 exports._updateSpreadsheetData = function(spreadsheet, rows) {
-  spreadsheet.updateSpreadsheetData(rows);
-  return spreadsheet;
+  return spreadsheet.updateSpreadsheetData(rows);
 }

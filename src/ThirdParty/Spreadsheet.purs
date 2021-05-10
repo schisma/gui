@@ -10,7 +10,9 @@ foreign import data Spreadsheet ∷ Type
 
 type Callbacks
   = { afterChange :: Spreadsheet -> Effect Unit
+    , afterCreateCol :: Spreadsheet -> Int -> Effect Unit
     , afterCreateRow :: Spreadsheet -> Effect Unit
+    , afterRemoveCol :: Spreadsheet -> Array Int -> Effect Unit
     , afterRemoveRow :: Spreadsheet -> Effect Unit
     , onBlur :: Spreadsheet -> Effect Unit
     , onMute :: Spreadsheet -> Effect Unit

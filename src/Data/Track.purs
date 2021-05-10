@@ -1,6 +1,7 @@
 module Data.Track
   ( Track(..)
   , fromTrackerData
+  , newInstrumentTrack
   , toggleMute
   , toggleSolo
   , toCsvName
@@ -40,6 +41,14 @@ data TrackHeader
   = MasterHeader
   | LineNumberHeader
   | InstrumentHeader Int String Boolean Boolean
+
+newInstrumentTrack :: Instrument -> Track
+newInstrumentTrack instrument =
+  InstrumentTrack { instrumentId: instrument.id
+                  , mute: false
+                  , name:  instrument.name
+                  , solo: false
+                  }
 
 toggleMute :: Track -> Track
 toggleMute (InstrumentTrack t) = InstrumentTrack $ t { mute = not t.mute }
