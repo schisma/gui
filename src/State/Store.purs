@@ -3,7 +3,6 @@ module State.Store where
 import Prelude
 
 import Control.Monad.Reader (class MonadAsk, asks)
-import Data.Maybe(Maybe(..))
 import Effect.Aff.Bus as Bus
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (liftEffect)
@@ -22,14 +21,7 @@ getGlobalState = do
   pure state
 
 initialGlobalState :: GlobalState
-initialGlobalState =
-  { ids: { lastInstrumentId: 0 }
-  , instruments: []
-  , instrumentsFile: ""
-  , synths: Nothing
-  , trackerFile: ""
-  , tracks: []
-  }
+initialGlobalState = { }
 
 updateGlobalState
   :: forall m r

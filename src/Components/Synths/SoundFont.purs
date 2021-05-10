@@ -7,6 +7,7 @@ import Data.Array (find)
 import Data.Const (Const)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
+import Data.UUID (UUID)
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -21,7 +22,7 @@ import Data.Instrument (Instrument)
 import Env (GlobalEnvironment)
 
 type Slots
-  = ( dial :: H.Slot (Const Void) SynthControlOutput (Tuple Int String)
+  = ( dial :: H.Slot (Const Void) SynthControlOutput (Tuple UUID String)
     )
 
 type Input

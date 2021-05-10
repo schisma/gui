@@ -3,6 +3,7 @@ module Components.Router where
 import Prelude
 
 import Control.Monad.Reader (class MonadAsk)
+import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Either (hush)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Effect.Aff.Class (class MonadAff)
@@ -26,13 +27,14 @@ import Components.Home as Home
 import Data.ApplicationError (ApplicationError(..))
 import Data.Component (OpaqueSlot)
 import Data.Route (Route(..), routeCodec)
+import Data.Synth (Synth)
 import Env (GlobalEnvironment)
-import State.Global (populateSynths)
 import ThirdParty.Socket (Socket, createSocket)
 
 type State =
   { route :: Maybe Route
   , maybeSocket :: Maybe Socket
+  , maybeSynths :: Maybe (NonEmptyArray Synth)
   | Connect.WithGlobalState ()
   }
 
@@ -60,7 +62,8 @@ component
   => Navigate m
   => H.Component Query {} Void m
 component = Connect.component $ H.mkComponent
-  { initialState: merge { maybeSocket: Nothing, route: Nothing }
+  { initialState:
+      merge { maybeSocket: Nothing, route: Nothing, maybeSynths: Nothing }
   , render
   , eval: H.mkEval $ H.defaultEval
       { handleAction = handleAction
@@ -75,10 +78,11 @@ component = Connect.component $ H.mkComponent
   handleAction = case _ of
     Initialize -> do
       socket <- liftEffect $ createSocket 8888
-      H.modify_ _ { maybeSocket = Just socket }
+      maybeSynths <- getSynths
 
-      synths <- getSynths
-      populateSynths synths
+      H.modify_ _ { maybeSocket = Just socket
+                  , maybeSynths = maybeSynths
+                  }
 
       initialRoute <- hush <<< (parse routeCodec) <$> liftEffect getHash
       navigate $ fromMaybe Home initialRoute
@@ -100,7 +104,7 @@ component = Connect.component $ H.mkComponent
       pure (Just a)
 
   render :: State -> H.ComponentHTML Action ChildSlots m
-  render { route, maybeSocket, globalState } =
+  render { route, maybeSocket, maybeSynths, globalState } =
     case maybeSocket of
       Nothing ->
         HH.slot
@@ -110,7 +114,7 @@ component = Connect.component $ H.mkComponent
           { error: NoSocket }
           absurd
       Just socket ->
-        case globalState.synths of
+        case maybeSynths of
           Nothing ->
             HH.slot
               (Proxy :: _ "clientError")
@@ -119,7 +123,7 @@ component = Connect.component $ H.mkComponent
               { error: NoSynths }
               absurd
 
-          _ -> case route of
+          Just synths -> case route of
             Nothing -> HH.div_ [ HH.text "Page Not Found" ]
 
             Just r -> case r of
@@ -128,7 +132,7 @@ component = Connect.component $ H.mkComponent
                   (Proxy :: _ "home")
                   unit
                   Home.component
-                  { globalState, socket }
+                  { socket, synths }
                   absurd
 
               ClientError error ->

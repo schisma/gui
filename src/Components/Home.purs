@@ -3,10 +3,22 @@ module Components.Home where
 import Prelude
 
 import Control.Monad.Reader (class MonadAsk)
-import Data.Array ((!!), catMaybes, elem, head, length, modifyAtIndices, nub)
+import Data.Array ( (!!)
+                  , (:)
+                  , catMaybes
+                  , elem
+                  , head
+                  , length
+                  , modifyAtIndices
+                  , nub
+                  , tail
+                  )
+import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Const (Const)
-import Data.Maybe (Maybe(..))
+import Data.Either (Either(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Traversable (traverse_)
+import Data.UUID (genUUID)
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML.Events as HE
@@ -16,57 +28,80 @@ import Record (merge)
 import Type.Proxy (Proxy(..))
 
 import Capabilities.LogMessage (class LogMessage)
-import Capabilities.Resources.Instrument (class ManageInstrument)
+import Capabilities.Resources.Instrument ( class ManageInstrument
+                                         , createInstrument
+                                         , getInstrumentsFromFile
+                                         )
 import Capabilities.Resources.Midi ( class ManageMidi
                                    , sendMidiChannel
                                    , sendMidiMessage
                                    )
-import Capabilities.Resources.Tracker (class ManageTracker)
-import Components.HigherOrder.Connect as Connect
+import Capabilities.Resources.Tracker ( class ManageTracker
+                                      , getTrackerDataFromFile
+                                      , play
+                                      , stop
+                                      , updateTrackerData
+                                      )
 import Components.MidiKeyboard as MidiKeyboard
 import Components.Settings as Settings
 import Components.Synth as Synth
 import Components.Tracker as Tracker
-import Data.Component (OpaqueSlot, SynthControlOutput(..))
+import Data.Component (SynthControlOutput(..))
 import Data.Instrument ( Instrument
                        , midiControlChangeMessage
                        , midiControlChangeMessages
+                       , remove
                        )
 import Data.Midi (allowedCommands, midiMessage)
-import Data.Track (Track, toggleMute, toggleSolo, toInstrument)
+import Data.Synth (Synth)
+import Data.Track ( Track
+                  , fromTrackerData
+                  , toggleMute
+                  , toggleSolo
+                  , toCsvName
+                  , toInstrument
+                  )
+import Data.Utilities (modifyIfFound)
 import Env (GlobalEnvironment)
-import State.Global (setTracks)
+import ThirdParty.Papaparse (unparse)
 import ThirdParty.Socket (Socket)
 
 type Slots
   = ( midiKeyboard :: H.Slot MidiKeyboard.Query MidiKeyboard.Output Unit
-    , settings :: OpaqueSlot Unit
+    , settings :: H.Slot (Const Void) Settings.Output Unit
     , synth :: H.Slot (Const Void) SynthControlOutput Unit
-    , tracker :: H.Slot (Const Void) Tracker.Output Unit
+    , tracker :: H.Slot Tracker.Query Tracker.Output Unit
     )
 
 type Input
   = { socket :: Socket
-    | Connect.WithGlobalState ()
+    , synths :: NonEmptyArray Synth
     }
 
 type State
   = { displayedPanel :: Panel
+    , instruments :: Array Instrument
+    , instrumentsFile :: String
     , selectedTrackIndices :: Array Int
     , socket :: Socket
-    | Connect.WithGlobalState ()
+    , synths :: NonEmptyArray Synth
+    , trackerFile :: String
+    , tracks :: Array Track
     }
 
 data Action
   = ChangePanel Panel
   | HandleMidiKeyboard MidiKeyboard.Output
+  | HandleSettings Settings.Output
   | HandleSynth SynthControlOutput
   | HandleTracker Tracker.Output
   | Receive { socket :: Socket
-            | Connect.WithGlobalState ()
+            , synths :: NonEmptyArray Synth
             }
   | SendMidiChannel
   | SendSelectedSynthParametersAsMidiCCMessages
+  | UpdateInstrument Instrument
+  | UpdateTrackerData String
 
 data Panel
   = Configuration
@@ -86,7 +121,11 @@ component
   => H.Component q Input Void m
 component = H.mkComponent
   { initialState: merge { displayedPanel: Configuration
+                        , instruments: []
+                        , instrumentsFile: "~/code/compositions/proof/instruments.json"
                         , selectedTrackIndices: []
+                        , trackerFile: "~/code/compositions/proof/tracker2.csv"
+                        , tracks: []
                         }
     , render
     , eval: H.mkEval $ H.defaultEval
@@ -119,9 +158,58 @@ component = H.mkComponent
 
                 in  sendMidiMessage state.socket formattedMessage
 
+    HandleSettings output ->
+      case output of
+        Settings.AddedInstrument -> do
+          state <- H.get
+
+          let number = length state.instruments + 1
+          instrument <- createInstrument state.synths number
+
+          H.modify_ _ { instruments = instrument : state.instruments }
+
+        Settings.ChangedInstrumentsFile file -> do
+          synths <- H.gets _.synths
+
+          instruments <- getInstrumentsFromFile synths file
+
+          H.modify_ _ { instruments = instruments
+                      , instrumentsFile = file
+                      }
+
+        Settings.ChangedTrackerFile file -> do
+          state <- H.get
+
+          trackerData <- getTrackerDataFromFile file
+          let tracks = fromTrackerData state.instruments trackerData
+              rows = fromMaybe [] $ tail trackerData
+
+          H.modify_ _ { trackerFile = file
+                      , tracks = tracks
+                      }
+          H.tell (Proxy :: _ "tracker") unit (Tracker.UpdateRows rows)
+
+        Settings.ClonedInstrument instrument -> do
+          state <- H.get
+          uuid <- H.liftEffect genUUID
+
+          let number = length state.instruments + 1
+          let clonedInstrument = instrument { id = uuid, number = number }
+
+          H.modify_ _ { instruments = clonedInstrument : state.instruments }
+
+        Settings.RemovedInstrument instrument -> do
+          state <- H.get
+          H.modify_ _ { instruments = remove state.instruments instrument }
+
+        Settings.UpdatedInstrument instrument ->
+          handleAction (UpdateInstrument instrument)
+
     HandleSynth output ->
       case output of
-        UpdatedSynthParameter synthParameter instrument ->
+        UpdatedSynthParameter synthParameter instrument -> do
+          handleAction (UpdateInstrument instrument)
+
           when (instrument.midiChannel > 0) do
             state <- H.get
 
@@ -134,8 +222,15 @@ component = H.mkComponent
         Tracker.Blurred ->
           H.tell (Proxy :: _ "midiKeyboard") unit MidiKeyboard.Focus
 
-        Tracker.Played ->
-          handleAction SendSelectedSynthParametersAsMidiCCMessages
+        Tracker.Played start end -> do
+          state <- H.get
+          result <- play state.trackerFile state.instrumentsFile start end
+
+          case result of
+            -- TODO: Some kind of error message
+            Left error -> pure unit
+            Right response ->
+              handleAction SendSelectedSynthParametersAsMidiCCMessages
 
         Tracker.SelectedColumns columns -> do
           H.modify_ _ { selectedTrackIndices = columns }
@@ -143,31 +238,39 @@ component = H.mkComponent
           handleAction SendMidiChannel
           handleAction SendSelectedSynthParametersAsMidiCCMessages
 
-        Tracker.ToggledMute -> do
+        Tracker.Stopped ->
+          stop
+
+        Tracker.ToggledMute trackerBody -> do
           state <- H.get
 
           let tracks =
                 modifyAtIndices
                 state.selectedTrackIndices
                 toggleMute
-                state.globalState.tracks
+                state.tracks
 
-          setTracks tracks
+          H.modify_ _ { tracks = tracks }
+          handleAction (UpdateTrackerData trackerBody)
 
-        Tracker.ToggledSolo -> do
+        Tracker.ToggledSolo trackerBody -> do
           state <- H.get
 
           let tracks =
                 modifyAtIndices
                 state.selectedTrackIndices
                 toggleSolo
-                state.globalState.tracks
+                state.tracks
 
-          setTracks tracks
+          H.modify_ _ { tracks = tracks }
+          handleAction (UpdateTrackerData trackerBody)
 
-    Receive { globalState, socket } ->
-      H.modify_ _ { globalState = globalState
-                  , socket = socket
+        Tracker.UpdatedTrackerData trackerBody ->
+          handleAction (UpdateTrackerData trackerBody)
+
+    Receive { socket, synths } ->
+      H.modify_ _ { socket = socket
+                  , synths = synths
                   }
 
     SendMidiChannel -> do
@@ -187,6 +290,26 @@ component = H.mkComponent
           let midiMessages = midiControlChangeMessages instrument
           traverse_ (sendMidiMessage state.socket) midiMessages
 
+    UpdateInstrument instrument -> do
+      state <- H.get
+
+      let instruments =
+            modifyIfFound
+            (\i -> i.id == instrument.id)
+            (const instrument)
+            state.instruments
+
+      H.modify_ _ { instruments = instruments }
+
+    UpdateTrackerData trackerBody -> do
+      state <- H.get
+
+      let header = map (toCsvName state.instruments) state.tracks
+          trackerHeader = unparse [header]
+          contents = trackerHeader <> "\n" <> trackerBody
+
+      updateTrackerData state.trackerFile contents
+
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div
@@ -195,7 +318,7 @@ component = H.mkComponent
           (Proxy :: _ "tracker")
           unit
           Tracker.component
-          { globalState: state.globalState }
+          { tracks: state.tracks }
           HandleTracker
 
       , HH.slot
@@ -229,10 +352,13 @@ component = H.mkComponent
               (Proxy :: _ "settings")
               unit
               Settings.component
-              { globalState: state.globalState
+              { instruments: state.instruments
+              , instrumentsFile: state.instrumentsFile
               , selectedInstrument: instrument
+              , synths: state.synths
+              , trackerFile: state.trackerFile
               }
-              absurd
+              HandleSettings
 
           SynthControls -> renderSynth instrument
 
@@ -279,8 +405,8 @@ component = H.mkComponent
         else
           case head tracks of
             Nothing -> Nothing
-            Just track -> toInstrument state.globalState.instruments track
+            Just track -> toInstrument state.instruments track
 
   selectedTracks :: State -> Array Track
   selectedTracks state =
-    catMaybes $ map ((!!) state.globalState.tracks) state.selectedTrackIndices
+    catMaybes $ map ((!!) state.tracks) state.selectedTrackIndices

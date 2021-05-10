@@ -17,7 +17,9 @@ import Data.Either (Either(..))
 import Data.Log.Level (LogLevel(Debug, Error, Info, Warn))
 import Data.Maybe (Maybe(..))
 import Data.JSDate (toISOString)
+import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
+import Data.UUID (genUUID)
 import Effect.Aff (Aff, ParAff)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect, liftEffect)
@@ -90,12 +92,13 @@ instance navigateAppM :: Navigate AppM where
 
 
 instance manageInstrumentAppM :: ManageInstrument AppM where
-  createInstrument availableSynths = do
+  createInstrument availableSynths number = do
+    uuid <- liftEffect genUUID
     let instrument = { availableSynths
-                     , id: 0
+                     , id: uuid
                      , midiChannel: 0
                      , name: "New Instrument"
-                     , number: 0
+                     , number
                      , soundFontPath: ""
                      , synth: head availableSynths
                      }
@@ -105,14 +108,14 @@ instance manageInstrumentAppM :: ManageInstrument AppM where
     result <- mkRequest { endpoint: InstrumentsFromFile { file }
                         , method: Request.Get
                         }
-    let
-     instruments = case result of
-        Nothing -> []
-        Just response -> case decodeJson response of
-          Left decodeError -> []
-          Right decoded -> map (fromInstrumentJson availableSynths) decoded
-
-    pure instruments
+    case result of
+      Nothing -> pure []
+      Just response -> case decodeJson response of
+        Left decodeError -> pure []
+        Right decoded ->
+          for decoded \json -> do
+            uuid <- liftEffect genUUID
+            pure $ fromInstrumentJson availableSynths uuid json
 
 
 instance manageMidiAppM :: ManageMidi AppM where

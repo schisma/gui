@@ -7,6 +7,7 @@ import Data.Array (find)
 import Data.Const (Const)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
+import Data.UUID (UUID)
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -24,10 +25,10 @@ import Data.Instrument (Instrument)
 import Env (GlobalEnvironment)
 
 type Slots
-  = ( dial :: H.Slot (Const Void) SynthControlOutput (Tuple Int String)
-    , radio :: H.Slot (Const Void) SynthControlOutput (Tuple Int String)
-    , slider :: H.Slot (Const Void) SynthControlOutput (Tuple Int String)
-    , toggle :: H.Slot (Const Void) SynthControlOutput (Tuple Int String)
+  = ( dial :: H.Slot (Const Void) SynthControlOutput (Tuple UUID String)
+    , radio :: H.Slot (Const Void) SynthControlOutput (Tuple UUID String)
+    , slider :: H.Slot (Const Void) SynthControlOutput (Tuple UUID String)
+    , toggle :: H.Slot (Const Void) SynthControlOutput (Tuple UUID String)
     )
 
 type Input
@@ -64,8 +65,8 @@ component =
   handleAction = case _ of
     HandleSynthControl output -> H.raise output
 
-    Receive { selectedInstrument} -> do
-      H.modify_ _ { selectedInstrument = selectedInstrument }
+    Receive record -> do
+      H.put record
 
   renderDial
     :: State

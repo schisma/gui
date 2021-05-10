@@ -20,7 +20,6 @@ import Data.Instrument ( Instrument
                        )
 import Data.Synth (SynthParameter)
 import Env (GlobalEnvironment)
-import State.Global (updateInstrument)
 import ThirdParty.Nexus as Nexus
 
 type Slots :: forall k. Row k
@@ -88,7 +87,6 @@ component =
         H.modify_ _ { selectedInstrument = instrument
                     , synthParameter = synthParameter
                     }
-        updateInstrument instrument
 
         H.raise (UpdatedSynthParameter synthParameter instrument)
 

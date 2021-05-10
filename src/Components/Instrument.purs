@@ -3,6 +3,7 @@ module Components.Instrument where
 import Prelude
 
 import Control.Monad.Reader (class MonadAsk)
+import Data.Array.NonEmpty (NonEmptyArray, toArray)
 import Data.Int (fromString)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
@@ -10,26 +11,22 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Record as Record
-import Type.Proxy (Proxy(..))
 
 import Capabilities.LogMessage (class LogMessage)
 import Data.Instrument (Instrument, updateSynth)
 import Data.Midi (availableChannels)
 import Data.Synth (Synth)
 import Env (GlobalEnvironment)
-import State.Global (addInstrument, removeInstrument, updateInstrument)
 import Svg.Icons (iconCopy, iconSelectArrow, iconTrash)
 
 type Input
-  = { synths :: Array Synth
+  = { synths :: NonEmptyArray Synth
     , instrument :: Instrument
     }
 
 type State
-  = { synths :: Array Synth
+  = { synths :: NonEmptyArray Synth
     , instrument :: Instrument
-    , availableMidiChannels :: Array Int
     }
 
 type Slots :: forall k. Row k
@@ -44,21 +41,25 @@ data ChangedField
 data Action
   = ChangeField Instrument ChangedField
   | Clone Instrument
-  | Receive { synths :: Array Synth, instrument :: Instrument }
+  | Receive { synths :: NonEmptyArray Synth
+            , instrument :: Instrument
+            }
   | Remove Instrument
+
+data Output
+  = ClonedInstrument Instrument
+  | RemovedInstrument Instrument
+  | UpdatedInstrument Instrument
 
 component
   :: forall q m r
    . MonadAff m
   => LogMessage m
   => MonadAsk { globalEnvironment :: GlobalEnvironment | r } m
-  => H.Component q Input Void m
+  => H.Component q Input Output m
 component =
   H.mkComponent
-    { initialState:
-        Record.insert
-        (Proxy :: _ "availableMidiChannels")
-        availableChannels
+    { initialState: identity
     , render
     , eval: H.mkEval $ H.defaultEval
         { handleAction = handleAction
@@ -67,7 +68,7 @@ component =
     }
   where
 
-  handleAction :: Action -> H.HalogenM State Action Slots Void m Unit
+  handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
     ChangeField instrument field -> do
       let updatedInstrument = case field of
@@ -79,16 +80,16 @@ component =
                 Nothing -> instrument
                 Just number -> instrument { midiChannel = number }
 
-      updateInstrument updatedInstrument
+      H.raise (UpdatedInstrument updatedInstrument)
 
     Clone instrument ->
-      addInstrument instrument
+      H.raise (ClonedInstrument instrument)
 
-    Receive { synths, instrument } ->
-      H.modify_ _ { synths = synths, instrument = instrument }
+    Receive record ->
+      H.put record
 
     Remove instrument ->
-      removeInstrument instrument
+      H.raise (RemovedInstrument instrument)
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =
@@ -139,7 +140,7 @@ component =
                           , HE.onValueChange
                               (ChangeField state.instrument <<< FieldSynth)
                           ]
-                          (map renderSynth state.synths)
+                          (map renderSynth $ toArray state.synths)
                       , HH.div
                           [ HP.class_ (HH.ClassName "select-arrow") ]
                           [ iconSelectArrow
@@ -191,7 +192,7 @@ component =
                           , HE.onValueChange
                               (ChangeField state.instrument <<< FieldMidiChannel)
                           ]
-                          (map renderMidiChannel state.availableMidiChannels)
+                          (map renderMidiChannel availableChannels)
                       , HH.div
                           [ HP.class_ (HH.ClassName "select-arrow") ]
                           [ iconSelectArrow
@@ -295,10 +296,8 @@ component =
   renderMidiChannel channel =
     let value = show channel
         name = if channel == 0 then "0 (Off)" else value
-    in HH.option [ HP.value value ] [ HH.text name ]
+    in  HH.option [ HP.value value ] [ HH.text name ]
 
   renderSynth :: Synth -> H.ComponentHTML Action Slots m
   renderSynth { name } =
-    HH.option
-      [ HP.value name ]
-      [ HH.text name ]
+    HH.option [ HP.value name ] [ HH.text name ]

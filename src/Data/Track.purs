@@ -16,6 +16,7 @@ import Data.Array (catMaybes, find, head)
 import Data.Either (Either(..))
 import Data.Int (fromString)
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.UUID (UUID)
 import Text.Parsing.StringParser (Parser, runParser)
 import Text.Parsing.StringParser.CodePoints (char, regex, skipSpaces, string)
 import Text.Parsing.StringParser.Combinators (choice, optionMaybe)
@@ -26,7 +27,7 @@ data Track
   = MasterTrack
   | LineNumberTrack
   | InstrumentTrack
-    { instrumentId :: Int
+    { instrumentId :: UUID
     , mute :: Boolean
     , name :: String
     , solo :: Boolean

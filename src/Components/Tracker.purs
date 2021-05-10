@@ -2,33 +2,18 @@ module Components.Tracker where
 
 import Prelude
 import Control.Monad.Reader (class MonadAsk)
-import Data.Array (tail)
-import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 import Halogen.Subscription as HS
-import Record as Record
-import Type.Proxy (Proxy(..))
 
 import Capabilities.LogMessage (class LogMessage)
 import Capabilities.Resources.Midi (class ManageMidi)
-import Capabilities.Resources.Tracker ( class ManageTracker
-                                      , getTrackerDataFromFile
-                                      , play
-                                      , stop
-                                      , updateTrackerData
-                                      )
-import Components.HigherOrder.Connect as Connect
-import Data.Track ( fromTrackerData
-                  , toCsvName
-                  , toName
-                  )
+import Capabilities.Resources.Tracker (class ManageTracker)
+import Data.Track (Track, toName)
 import Env (GlobalEnvironment)
-import State.Global (setTracks)
-import ThirdParty.Papaparse (unparse)
 import ThirdParty.Spreadsheet ( Spreadsheet
                               , exportAsCsv
                               , rowNumbers
@@ -40,13 +25,11 @@ import ThirdParty.Spreadsheet ( Spreadsheet
 type Slots :: forall k. Row k
 type Slots = ()
 
-type Input
-  = { | Connect.WithGlobalState ()
-    }
+type Input = { tracks :: Array Track
+             }
 
 type State
   = { tracker :: Maybe Spreadsheet
-    | Connect.WithGlobalState ()
     }
 
 data Action
@@ -55,34 +38,40 @@ data Action
   | Play Int Int
   | PlayOnlyMidi Spreadsheet
   | PlayTracker Spreadsheet
-  | Receive { | Connect.WithGlobalState () }
+  | Receive { tracks :: Array Track }
   | SelectColumn Spreadsheet (Array Int)
   | StopTracker
-  | ToggleMuteSelectedTrack
-  | ToggleSoloSelectedTrack
+  | ToggleMuteSelectedTrack Spreadsheet
+  | ToggleSoloSelectedTrack Spreadsheet
   | UpdateTrackerData Spreadsheet
 
 data Output
   = Blurred
-  | Played
+  | Played Int Int
   | SelectedColumns (Array Int)
-  | ToggledMute
-  | ToggledSolo
+  | Stopped
+  | ToggledMute String
+  | ToggledSolo String
+  | UpdatedTrackerData String
+
+data Query a
+  = UpdateRows (Array (Array String)) a
 
 component
-  :: forall q m r
+  :: forall m r
    . MonadAff m
   => LogMessage m
   => MonadAsk { globalEnvironment :: GlobalEnvironment | r } m
   => ManageMidi m
   => ManageTracker m
-  => H.Component q Input Output m
+  => H.Component Query Input Output m
 component =
   H.mkComponent
-    { initialState: Record.insert (Proxy :: _ "tracker") Nothing
+    { initialState: const { tracker: Nothing }
     , render
     , eval: H.mkEval $ H.defaultEval
       { handleAction = handleAction
+      , handleQuery = handleQuery
       , initialize = Just Initialize
       , receive = Just <<< Receive
       }
@@ -107,7 +96,7 @@ component =
                       , onBlur: \sheet ->
                           HS.notify listener Blur
                       , onMute: \sheet ->
-                          HS.notify listener ToggleMuteSelectedTrack
+                          HS.notify listener (ToggleMuteSelectedTrack sheet)
                       , onPlay: \sheet ->
                           HS.notify listener (PlayTracker sheet)
                       , onPlayOnlyMidi: \sheet ->
@@ -115,7 +104,7 @@ component =
                       , onSelection: \sheet columns ->
                           HS.notify listener (SelectColumn sheet columns)
                       , onSolo: \sheet ->
-                          HS.notify listener ToggleSoloSelectedTrack
+                          HS.notify listener (ToggleSoloSelectedTrack sheet)
                       , onStop: \sheet ->
                           HS.notify listener StopTracker
                       }
@@ -123,76 +112,56 @@ component =
       tracker <- H.liftEffect $ spreadsheet "tracker" callbacks
       H.modify_ _ { tracker = Just tracker }
 
-    Play start end -> do
-      globalState <- H.gets _.globalState
+    Play start end ->
+      H.raise (Played start end)
 
-      result <- play
-        globalState.trackerFile
-        globalState.instrumentsFile
-        start
-        end
+    PlayOnlyMidi sheet ->
+      handleAction (Play (-1) (-1))
 
-      case result of
-        -- TODO: Some kind of error message
-        Left error -> pure unit
-        Right response -> H.raise Played
-
-    PlayOnlyMidi sheet -> handleAction (Play (-1) (-1))
-
-    PlayTracker sheet -> do
+    PlayTracker sheet ->
       let numbers = rowNumbers sheet
-      handleAction (Play numbers.start numbers.end)
+      in  handleAction (Play numbers.start numbers.end)
 
-    Receive { globalState } -> do
-      localState <- H.get
+    Receive { tracks } -> do
+      state <- H.get
 
-      H.modify_ _ { globalState = globalState }
+      case state.tracker of
+        Nothing -> pure unit
+        Just tracker -> do
+          let headers = map toName tracks
 
-      if localState.globalState.trackerFile == globalState.trackerFile then
-        case localState.tracker of
-          Nothing -> pure unit
-          Just tracker -> do
-            let headers = map toName globalState.tracks
-
-            tracker' <- H.liftEffect $ updateHeaders tracker headers
-            H.modify_ _ { tracker = Just tracker' }
-      else do
-        trackerData <- getTrackerDataFromFile globalState.trackerFile
-        let tracks = fromTrackerData globalState.instruments trackerData
-
-        setTracks tracks
-
-        case localState.tracker of
-          Nothing -> pure unit
-          Just tracker -> do
-            let headers = map toName tracks
-                rows = fromMaybe [] $ tail trackerData
-
-            tracker' <- H.liftEffect $ updateHeaders tracker headers
-            tracker'' <- H.liftEffect $ updateData tracker' rows
-
-            H.modify_ _ { tracker = Just tracker'' }
+          tracker' <- H.liftEffect $ updateHeaders tracker headers
+          H.modify_ _ { tracker = Just tracker' }
 
     SelectColumn sheet columns -> do
        H.raise (SelectedColumns columns)
 
-    ToggleMuteSelectedTrack -> do
-       H.raise ToggledMute
+    ToggleMuteSelectedTrack sheet -> do
+       H.raise (ToggledMute $ exportAsCsv sheet)
 
-    ToggleSoloSelectedTrack -> do
-       H.raise ToggledSolo
+    ToggleSoloSelectedTrack sheet -> do
+       H.raise (ToggledSolo $ exportAsCsv sheet)
 
-    StopTracker -> stop
+    StopTracker ->
+      H.raise Stopped
 
     UpdateTrackerData sheet -> do
-      globalState <- H.gets _.globalState
+      H.raise (UpdatedTrackerData $ exportAsCsv sheet)
 
-      let header = map (toCsvName globalState.instruments) globalState.tracks
-          csvHeader = unparse [header]
-          csvRows = exportAsCsv sheet
-          contents = csvHeader <> "\n" <> csvRows
+  handleQuery
+    :: forall a. Query a
+    -> H.HalogenM State Action Slots Output m (Maybe a)
+  handleQuery = case _ of
+    UpdateRows rows a -> do
+      state <- H.get
 
-      updateTrackerData globalState.trackerFile contents
+      case state.tracker of
+        Nothing -> pure unit
+        Just tracker -> do
+          tracker' <- H.liftEffect $ updateData tracker rows
+          H.modify_ _ { tracker = Just tracker' }
+
+      pure (Just a)
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =

@@ -4,60 +4,68 @@ import Prelude
 
 import Control.Monad.Reader (class MonadAsk)
 import Data.Array (sortWith)
-import Data.Array.NonEmpty (toArray)
+import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Const (Const)
 import Data.Maybe (Maybe(..))
+import Data.UUID (UUID)
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Record (merge)
 import Type.Proxy (Proxy(..))
 import Web.Event.Event (preventDefault)
 import Web.UIEvent.MouseEvent (MouseEvent, toEvent)
 
 import Capabilities.LogMessage (class LogMessage)
-import Capabilities.Resources.Instrument ( class ManageInstrument
-                                         , createInstrument
-                                         , getInstrumentsFromFile
-                                         )
+import Capabilities.Resources.Instrument (class ManageInstrument)
 import Capabilities.Resources.Midi (class ManageMidi)
-import Components.HigherOrder.Connect as Connect
 import Components.Instrument as Instrument
-import Data.Component (OpaqueSlot)
 import Data.Instrument (Instrument)
 import Data.Synth (Synth)
 import Env (GlobalEnvironment)
-import State.Global ( addInstrument
-                    , setInstruments
-                    , setInstrumentsFile
-                    , setTrackerFile
-                    )
 
 type Slots
-  = ( instrument :: OpaqueSlot Int
+  = ( instrument :: H.Slot (Const Void) Instrument.Output UUID
     )
 
 type Input
-  = { selectedInstrument :: Maybe Instrument
-    | Connect.WithGlobalState () }
+  = { instruments :: Array Instrument
+    , instrumentsFile :: String
+    , selectedInstrument :: Maybe Instrument
+    , synths :: NonEmptyArray Synth
+    , trackerFile :: String
+    }
 
 type State
-  = { instrumentsFile :: String
+  = { instruments :: Array Instrument
+    , instrumentsFile :: String
     , selectedInstrument :: Maybe Instrument
+    , synths :: NonEmptyArray Synth
     , trackerFile :: String
-    | Connect.WithGlobalState ()
     }
 
 data Action
   = AddInstrument MouseEvent
   | ChangeInstrumentsFile String
   | ChangeTrackerFile String
+  | HandleInstrument Instrument.Output
   | LoadInstrumentsFromFile MouseEvent String
   | LoadTrackerFromFile MouseEvent String
-  | Receive { selectedInstrument :: Maybe Instrument
-            | Connect.WithGlobalState ()
+  | Receive { instruments :: Array Instrument
+            , instrumentsFile :: String
+            , selectedInstrument :: Maybe Instrument
+            , synths :: NonEmptyArray Synth
+            , trackerFile :: String
             }
+
+data Output
+  = AddedInstrument
+  | ChangedInstrumentsFile String
+  | ChangedTrackerFile String
+  | ClonedInstrument Instrument
+  | RemovedInstrument Instrument
+  | UpdatedInstrument Instrument
 
 component
   :: forall q m r
@@ -66,13 +74,10 @@ component
   => MonadAsk { globalEnvironment :: GlobalEnvironment | r } m
   => ManageInstrument m
   => ManageMidi m
-  => H.Component q Input Void m
+  => H.Component q Input Output m
 component =
   H.mkComponent
-    { initialState: merge
-      { instrumentsFile: "~/code/compositions/proof/instruments2.json"
-      , trackerFile: "~/code/compositions/proof/tracker2.csv"
-      }
+    { initialState: identity
     , render
     , eval: H.mkEval $ H.defaultEval
       { handleAction = handleAction
@@ -81,52 +86,43 @@ component =
     }
   where
 
-  handleAction :: Action -> H.HalogenM State Action Slots Void m Unit
+  handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
     AddInstrument mouseEvent -> do
       H.liftEffect $ preventDefault (toEvent mouseEvent)
-
-      globalState <- H.gets _.globalState
-      case globalState.synths of
-        Just availableSynths -> do
-          instrument <- createInstrument availableSynths
-          addInstrument instrument
-        Nothing -> pure unit
+      H.raise AddedInstrument
 
     ChangeInstrumentsFile file ->
-      H.modify_ _ { instrumentsFile = file }
+      H.raise (ChangedInstrumentsFile file)
 
-    ChangeTrackerFile file ->
-      H.modify_ _ { trackerFile = file }
+    ChangeTrackerFile file -> do
+      H.raise (ChangedTrackerFile file)
+
+    HandleInstrument output ->
+      case output of
+        Instrument.ClonedInstrument instrument ->
+          H.raise (ClonedInstrument instrument)
+
+        Instrument.RemovedInstrument instrument ->
+          H.raise (RemovedInstrument instrument)
+
+        Instrument.UpdatedInstrument instrument ->
+          H.raise (UpdatedInstrument instrument)
 
     LoadInstrumentsFromFile mouseEvent file -> do
       H.liftEffect $ preventDefault (toEvent mouseEvent)
-      setInstrumentsFile file
-
-      globalState <- H.gets _.globalState
-      case globalState.synths of
-        Just availableSynths -> do
-          instruments <- getInstrumentsFromFile availableSynths file
-          setInstruments instruments
-        Nothing -> pure unit
+      H.raise (ChangedInstrumentsFile file)
 
     LoadTrackerFromFile mouseEvent file -> do
       H.liftEffect $ preventDefault (toEvent mouseEvent)
-      setTrackerFile file
+      H.raise (ChangedTrackerFile file)
 
-    Receive { globalState, selectedInstrument } ->
-      H.modify_ _ { globalState = globalState
-                  , selectedInstrument = selectedInstrument
-                  }
+    Receive record ->
+      H.put record
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =
-    let
-      synths = case state.globalState.synths of
-        Just array -> toArray array
-        Nothing -> []
-
-      instruments = sortWith (_.number) state.globalState.instruments
+    let instruments = sortWith (_.number) state.instruments
 
     in  HH.div
           [ HP.class_ (HH.ClassName "panel") ]
@@ -239,7 +235,7 @@ component =
                       [ HP.class_ (HH.ClassName "text-2xl") ]
                       [ HH.text "Instruments" ]
                       , HH.div_ $
-                        map (renderInstrument synths) instruments
+                        map (renderInstrument state.synths) instruments
                   , HH.div
                       [ HP.class_ (HH.ClassName "mb-5") ]
                       [ HH.div
@@ -263,7 +259,7 @@ component =
           ]
 
   renderInstrument
-    :: Array Synth
+    :: NonEmptyArray Synth
     -> Instrument
     -> H.ComponentHTML Action Slots m
   renderInstrument synths instrument =
@@ -272,4 +268,4 @@ component =
       instrument.id
       Instrument.component
       { synths, instrument }
-      absurd
+      HandleInstrument

@@ -7,6 +7,7 @@ import Data.Array.NonEmpty (NonEmptyArray, find, head)
 import Data.Int (floor)
 import Data.Map (fromFoldable, singleton)
 import Data.Maybe (Maybe(..))
+import Data.UUID (UUID)
 import Foreign.Object (Object, toUnfoldable)
 
 import Data.Midi(MidiMessage, midiMessage)
@@ -15,7 +16,7 @@ import Data.Utilities(scale)
 
 type Instrument
   = { availableSynths :: NonEmptyArray Synth
-    , id :: Int
+    , id :: UUID
     , midiChannel :: Int
     , name :: String
     , number :: Int
@@ -32,8 +33,12 @@ type InstrumentJson
     , soundFontPath :: String
     }
 
-fromInstrumentJson :: NonEmptyArray Synth -> InstrumentJson -> Instrument
-fromInstrumentJson availableSynths json =
+fromInstrumentJson
+  :: NonEmptyArray Synth
+  -> UUID
+  -> InstrumentJson
+  -> Instrument
+fromInstrumentJson availableSynths id json =
   let synth = case find (\s -> s.name == json.instrument) availableSynths of
                         Nothing -> head availableSynths
                         Just s -> s
@@ -41,7 +46,7 @@ fromInstrumentJson availableSynths json =
       parameters = fromFoldable $ (toUnfoldable json.parameters :: Array _)
 
   in  { availableSynths: availableSynths
-      , id: 0
+      , id
       , midiChannel: json.midiChannel
       , name: json.name
       , number: json.number
@@ -68,6 +73,13 @@ midiControlChangeMessages :: Instrument -> Array MidiMessage
 midiControlChangeMessages instrument =
   catMaybes $
     map (midiControlChangeMessage instrument) instrument.synth.parameters
+
+remove :: Array Instrument -> Instrument -> Array Instrument
+remove instruments instrumentToRemove =
+  let filteredInstruments = Array.filter ((/=) instrumentToRemove) instruments
+  in  Array.mapWithIndex
+        (\index instr -> instr { number = index + 1 })
+        $ Array.sortWith (_.number) filteredInstruments
 
 updateSynth :: Instrument -> String -> Instrument
 updateSynth instrument synthName =
