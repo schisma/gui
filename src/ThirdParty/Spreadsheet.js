@@ -270,7 +270,6 @@ class Spreadsheet {
     return { start: start, end: end };
   }
 
-  // TODO:
   updateSpreadsheetContextMenu(contextMenuItems) {
     this.spreadsheet.updateSettings({
       contextMenu: {
