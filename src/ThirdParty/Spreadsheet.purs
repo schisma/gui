@@ -28,6 +28,32 @@ type RowNumbers
     , end :: Int
     }
 
+type SpreadsheetSelectionAttributes
+  = { col :: Int
+    , row :: Int
+    }
+
+type SpreadsheetSelection
+  = { start :: SpreadsheetSelectionAttributes
+    , end :: SpreadsheetSelectionAttributes
+    }
+
+type SubMenuItem
+  = { key :: String
+    , name :: String
+    , callback :: EffectFn2 String (Array SpreadsheetSelection) Unit
+    }
+
+type SubMenu
+  = { items :: Array SubMenuItem
+    }
+
+type ContextMenuItem
+  = { key :: String
+    , name :: String
+    , submenu :: SubMenu
+    }
+
 
 foreign import exportAsCsv ∷ Spreadsheet -> String
 
@@ -42,6 +68,12 @@ foreign import _spreadsheet ∷ EffectFn2 String Callbacks Spreadsheet
 
 spreadsheet :: String -> Callbacks -> Effect Spreadsheet
 spreadsheet element callbacks = runEffectFn2 _spreadsheet element callbacks
+
+
+foreign import _updateSpreadsheetContextMenu ∷ EffectFn2 Spreadsheet (Array ContextMenuItem) Spreadsheet
+
+updateContextMenu :: Spreadsheet -> Array ContextMenuItem -> Effect Spreadsheet
+updateContextMenu sheet items = runEffectFn2 _updateSpreadsheetContextMenu sheet items
 
 
 foreign import _updateSpreadsheetData ∷ EffectFn2 Spreadsheet (Array (Array String)) Spreadsheet

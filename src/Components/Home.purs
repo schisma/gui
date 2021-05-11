@@ -19,7 +19,7 @@ import Data.Const (Const)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Traversable (traverse_)
-import Data.UUID (genUUID)
+import Data.UUID (genUUID, parseUUID)
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML.Events as HE
@@ -62,6 +62,7 @@ import Data.Track ( Track
                   , toggleSolo
                   , toCsvName
                   , toInstrument
+                  , updateInstrumentId
                   )
 import Data.Utilities (deleteAtIndices, modifyIfFound)
 import Env (GlobalEnvironment)
@@ -239,6 +240,21 @@ component = H.mkComponent
         Tracker.Blurred ->
           H.tell (Proxy :: _ "midiKeyboard") unit MidiKeyboard.Focus
 
+        Tracker.ChangedInstrument uuid trackIndices ->
+          case parseUUID uuid of
+            Nothing -> pure unit
+            Just id -> do
+              state <- H.get
+
+              let tracks =
+                    modifyAtIndices
+                    trackIndices
+                    (updateInstrumentId id)
+                    state.tracks
+
+              H.modify_ _ { tracks = tracks }
+              handleAction UpdateTrackerData
+
         Tracker.Played start end -> do
           state <- H.get
           result <- play state.trackerFile state.instrumentsFile start end
@@ -346,7 +362,7 @@ component = H.mkComponent
           (Proxy :: _ "tracker")
           unit
           Tracker.component
-          { tracks: state.tracks }
+          { instruments: state.instruments, tracks: state.tracks }
           HandleTracker
 
       , HH.slot

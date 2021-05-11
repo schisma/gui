@@ -2,8 +2,13 @@ module Components.Tracker where
 
 import Prelude
 import Control.Monad.Reader (class MonadAsk)
+import Data.Array (concatMap, difference, nub, range)
 import Data.Maybe (Maybe(..))
+import Data.String (Pattern(..), Replacement(..), replace)
+import Data.UUID (toString)
+import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Uncurried (mkEffectFn2)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
@@ -12,12 +17,16 @@ import Halogen.Subscription as HS
 import Capabilities.LogMessage (class LogMessage)
 import Capabilities.Resources.Midi (class ManageMidi)
 import Capabilities.Resources.Tracker (class ManageTracker)
+import Data.Instrument (Instrument)
 import Data.Track (Track, toName)
 import Env (GlobalEnvironment)
-import ThirdParty.Spreadsheet ( Spreadsheet
+import ThirdParty.Spreadsheet ( ContextMenuItem
+                              , Spreadsheet
+                              , SpreadsheetSelection
                               , exportAsCsv
                               , rowNumbers
                               , spreadsheet
+                              , updateContextMenu
                               , updateData
                               , updateHeaders
                               )
@@ -25,7 +34,8 @@ import ThirdParty.Spreadsheet ( Spreadsheet
 type Slots :: forall k. Row k
 type Slots = ()
 
-type Input = { tracks :: Array Track
+type Input = { instruments :: Array Instrument
+             , tracks :: Array Track
              }
 
 type State
@@ -35,11 +45,14 @@ type State
 data Action
   = AddColumn Spreadsheet Int
   | Blur
+  | ChangeInstrument String (Array Int)
   | Initialize
   | Play Int Int
   | PlayOnlyMidi
   | PlayTracker Spreadsheet
-  | Receive { tracks :: Array Track }
+  | Receive { instruments :: Array Instrument
+            , tracks :: Array Track
+            }
   | RemoveColumns Spreadsheet (Array Int)
   | SelectColumns Spreadsheet (Array Int)
   | StopTracker
@@ -50,6 +63,7 @@ data Action
 data Output
   = AddedColumn Int
   | Blurred
+  | ChangedInstrument String (Array Int)
   | Played Int Int
   | RemovedColumns (Array Int)
   | SelectedColumns (Array Int)
@@ -61,6 +75,32 @@ data Output
 data Query a
   = GetTrackerBody (String -> a)
   | UpdateRows (Array (Array String)) a
+
+contextMenuInstrumentCallback
+  :: HS.Listener Action
+  -> String
+  -> Array SpreadsheetSelection
+  -> Effect Unit
+contextMenuInstrumentCallback listener key selections =
+  let uuid = replace (Pattern "instrument:") (Replacement "") key
+      toRange selection = range selection.start.col selection.end.col
+      trackIndices = difference (nub $ concatMap toRange selections) [0, 1]
+  in
+      HS.notify listener (ChangeInstrument uuid trackIndices)
+
+contextMenuItems :: HS.Listener Action -> Array Instrument -> Array ContextMenuItem
+contextMenuItems listener instruments  =
+  let callback = mkEffectFn2 $ contextMenuInstrumentCallback listener
+      toItem instrument = { key: "instrument:" <> (toString instrument.id)
+                          , name: instrument.name
+                          , callback: callback
+                          }
+      subMenu = { items: map toItem instruments }
+  in  [ { key: "instrument"
+        , name: "Instrument"
+        , submenu: subMenu
+        }
+      ]
 
 component
   :: forall m r
@@ -90,6 +130,9 @@ component =
 
     Blur -> do
       H.raise Blurred
+
+    ChangeInstrument uuid trackIndices ->
+      H.raise (ChangedInstrument uuid trackIndices)
 
     Initialize -> do
       { emitter, listener } <- H.liftEffect HS.create
@@ -134,15 +177,20 @@ component =
       let numbers = rowNumbers sheet
       in  handleAction (Play numbers.start numbers.end)
 
-    Receive { tracks } -> do
+    Receive { instruments, tracks } -> do
       state <- H.get
 
       case state.tracker of
         Nothing -> pure unit
         Just tracker -> do
-          let headers = map toName tracks
+          let headers = map (toName instruments) tracks
+          { emitter, listener } <- H.liftEffect HS.create
+          void $ H.subscribe emitter
+
+          let contextMenu = contextMenuItems listener instruments
 
           void $ H.liftEffect $ updateHeaders tracker headers
+          void $ H.liftEffect $ updateContextMenu tracker contextMenu
 
     RemoveColumns sheet columns -> do
       H.raise (RemovedColumns columns)

@@ -7,6 +7,7 @@ module Data.Track
   , toCsvName
   , toInstrument
   , toName
+  , updateInstrumentId
   )
 where
 
@@ -30,7 +31,6 @@ data Track
   | InstrumentTrack
     { instrumentId :: UUID
     , mute :: Boolean
-    , name :: String
     , solo :: Boolean
     }
 
@@ -46,7 +46,6 @@ newInstrumentTrack :: Instrument -> Track
 newInstrumentTrack instrument =
   InstrumentTrack { instrumentId: instrument.id
                   , mute: false
-                  , name:  instrument.name
                   , solo: false
                   }
 
@@ -68,10 +67,11 @@ toCsvName instruments track = case track of
           else if instrumentTrack.solo then "S"
           else ""
         maybeInstrument = toInstrument instruments track
-        instrumentNumber = case maybeInstrument of
-                             Nothing -> "0"
-                             Just instrument -> show instrument.number
-     in  prefix <> "I" <> instrumentNumber <> " " <> instrumentTrack.name
+    in  case maybeInstrument of
+          Nothing ->
+            prefix <> "I0"
+          Just instrument ->
+            prefix <> "I" <> show instrument.number <> " " <> instrument.name
 
 toInstrument :: Array Instrument -> Track -> Maybe Instrument
 toInstrument instruments track =
@@ -82,16 +82,25 @@ toInstrument instruments track =
       instruments
     _ -> Nothing
 
-toName :: Track -> String
-toName = case _ of
+toName :: Array Instrument -> Track -> String
+toName instruments track = case track of
   MasterTrack -> "Master"
   LineNumberTrack -> "#"
-  InstrumentTrack track ->
+  InstrumentTrack instrumentTrack ->
     let prefix =
-          if track.mute then "(M) "
-          else if track.solo then "(S) "
+          if instrumentTrack.mute then "(M) "
+          else if instrumentTrack.solo then "(S) "
           else ""
-    in  prefix <> track.name
+        maybeInstrument = toInstrument instruments track
+        instrumentName = case maybeInstrument of
+                             Nothing -> ""
+                             Just instrument -> instrument.name
+    in  prefix <> instrumentName
+
+updateInstrumentId :: UUID -> Track -> Track
+updateInstrumentId uuid (InstrumentTrack t) =
+  InstrumentTrack $ t { instrumentId = uuid }
+updateInstrumentId _ t = t
 
 fromTrackerData :: Array Instrument -> Array (Array String) -> Array Track
 fromTrackerData instruments tracker =
@@ -113,7 +122,6 @@ parseTrackName instruments trackName =
             Just instrument -> Just $
               InstrumentTrack { instrumentId: instrument.id
                               , mute
-                              , name
                               , solo
                               }
 

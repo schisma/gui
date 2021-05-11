@@ -275,10 +275,14 @@ class Spreadsheet {
     this.spreadsheet.updateSettings({
       contextMenu: {
         items: Handsontable.plugins.ContextMenu.DEFAULT_ITEMS.concat(
+          ['---------']
+        ).concat(
           contextMenuItems
         )
       }
     });
+
+    return this;
   }
 
   updateSpreadsheetData(rows) {
@@ -308,6 +312,10 @@ exports._spreadsheet = function(id, callbacks) {
     '----------',
     callbacks
   );
+}
+
+exports._updateSpreadsheetContextMenu = function(spreadsheet, contextMenuItems) {
+  return spreadsheet.updateSpreadsheetContextMenu(contextMenuItems);
 }
 
 exports._updateSpreadsheetHeaders = function(spreadsheet, headers) {
