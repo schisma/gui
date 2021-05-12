@@ -74,6 +74,17 @@ midiControlChangeMessages instrument =
   catMaybes $
     map (midiControlChangeMessage instrument) instrument.synth.parameters
 
+new :: NonEmptyArray Synth -> UUID -> Int -> Instrument
+new availableSynths id number =
+  { availableSynths
+  , id
+  , midiChannel: 0
+  , name: "New Instrument"
+  , number
+  , soundFontPath: ""
+  , synth: head availableSynths
+  }
+
 remove :: Array Instrument -> Instrument -> Array Instrument
 remove instruments instrumentToRemove =
   let filteredInstruments = Array.filter ((/=) instrumentToRemove) instruments

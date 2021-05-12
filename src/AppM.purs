@@ -12,7 +12,6 @@ import Control.Monad.Reader.Trans
 import Control.Parallel (class Parallel, parallel, sequential)
 import Data.Argonaut.Decode.Class (decodeJson)
 import Data.Argonaut.Encode.Class (encodeJson)
-import Data.Array.NonEmpty (head)
 import Data.Either (Either(..))
 import Data.Log.Level (LogLevel(Debug, Error, Info, Warn))
 import Data.Maybe (Maybe(..))
@@ -92,18 +91,6 @@ instance navigateAppM :: Navigate AppM where
 
 
 instance manageInstrumentAppM :: ManageInstrument AppM where
-  createInstrument availableSynths number = do
-    uuid <- liftEffect genUUID
-    let instrument = { availableSynths
-                     , id: uuid
-                     , midiChannel: 0
-                     , name: "New Instrument"
-                     , number
-                     , soundFontPath: ""
-                     , synth: head availableSynths
-                     }
-    pure instrument
-
   getInstrumentsFromFile availableSynths file = do
     result <- mkRequest { endpoint: InstrumentsFromFile { file }
                         , method: Request.Get

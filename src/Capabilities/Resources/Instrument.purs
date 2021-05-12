@@ -10,11 +10,6 @@ import Data.Instrument (Instrument)
 import Data.Synth (Synth)
 
 class Monad m <= ManageInstrument m where
-  createInstrument
-    :: NonEmptyArray Synth
-    -> Int
-    -> m Instrument
-
   getInstrumentsFromFile
     :: NonEmptyArray Synth
     -> String
@@ -24,8 +19,6 @@ instance manageInstrumentHalogenM
   :: ManageInstrument m
   => ManageInstrument (HalogenM st act slots msg m)
   where
-
-  createInstrument availableSynths = lift <<< createInstrument availableSynths
 
   getInstrumentsFromFile availableSynths =
     lift <<< getInstrumentsFromFile availableSynths

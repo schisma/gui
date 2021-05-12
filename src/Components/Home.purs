@@ -30,7 +30,6 @@ import Type.Proxy (Proxy(..))
 
 import Capabilities.LogMessage (class LogMessage)
 import Capabilities.Resources.Instrument ( class ManageInstrument
-                                         , createInstrument
                                          , getInstrumentsFromFile
                                          )
 import Capabilities.Resources.Midi ( class ManageMidi
@@ -51,6 +50,7 @@ import Data.Component (SynthControlOutput(..))
 import Data.Instrument ( Instrument
                        , midiControlChangeMessage
                        , midiControlChangeMessages
+                       , new
                        , remove
                        )
 import Data.Midi (allowedCommands, midiMessage)
@@ -166,8 +166,9 @@ component = H.mkComponent
         Settings.AddedInstrument -> do
           state <- H.get
 
+          uuid <- H.liftEffect genUUID
           let number = length state.instruments + 1
-          instrument <- createInstrument state.synths number
+          let instrument = new state.synths uuid number
 
           H.modify_ _ { instruments = instrument : state.instruments }
 
