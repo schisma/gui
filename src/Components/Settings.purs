@@ -24,6 +24,7 @@ import Components.Instrument as Instrument
 import Data.Instrument (Instrument)
 import Data.Synth (Synth)
 import Env (GlobalEnvironment)
+import Svg.Icons (iconPlus)
 
 type Slots
   = ( instrument :: H.Slot (Const Void) Instrument.Output UUID
@@ -231,29 +232,54 @@ component =
                                                   , "w-1/2"
                                                   ])
                   ]
-                  [ HH.h2
-                      [ HP.class_ (HH.ClassName "text-2xl") ]
-                      [ HH.text "Instruments" ]
-                      , HH.div_ $
-                        map (renderInstrument state.synths) instruments
-                  , HH.div
-                      [ HP.class_ (HH.ClassName "mb-5") ]
-                      [ HH.div
-                          [ HP.class_ (HH.ClassName "flex") ]
-                          [ HH.div [ HP.class_ (HH.ClassName "w-1/4") ] []
-                          , HH.div [ HP.class_ (HH.ClassName "w-3/4") ]
-                              [ HH.button
-                                  [ HP.classes
-                                    (map HH.ClassName [ "btn-green"
-                                                      , "btn-normal"
-                                                      ])
-                                  , HE.onClick \event ->
-                                      AddInstrument event
-                                  ]
-                                  [ HH.text "Add Instrument" ]
-                              ]
-                          ]
+                  [ HH.div
+                    [ HP.classes (map HH.ClassName [ "flex"
+                                                   , "items-center"
+                                                   ])
+                    ]
+                    [ HH.div
+                      [ HP.class_ (HH.ClassName "w-3/4") ]
+                      [ HH.h2
+                        [ HP.class_ (HH.ClassName "text-2xl") ]
+                        [ HH.text "Instruments" ]
                       ]
+                    , HH.div
+                      [ HP.class_ (HH.ClassName "w-1/4") ]
+                      [ HH.div
+                        [ HP.classes (map HH.ClassName [ "flex"
+                                                       , "justify-end"
+                                                       ])
+                        ]
+                        [ HH.button
+                          [ HP.classes
+                            (map HH.ClassName [ "btn-green"
+                                              , "btn-normal"
+                                              ])
+                          , HE.onClick \event ->
+                              AddInstrument event
+                          ]
+                          [ HH.div
+                              [ HP.classes
+                                (map HH.ClassName [ "inline-block"
+                                                  , "align-middle"
+                                                  , "mr-1"
+                                                  ])
+                              ]
+                              [ iconPlus
+                                  []
+                              ]
+                          , HH.div
+                              [ HP.classes
+                                (map HH.ClassName [ "inline-block"
+                                                  , "align-middle"
+                                                  ])
+                              ]
+                              [ HH.text "Add" ]
+                          ]
+                        ]
+                      ]
+                    ]
+                  , HH.div_ $ map (renderInstrument state.synths) instruments
                   ]
               ]
           ]
