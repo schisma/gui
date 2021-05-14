@@ -2,6 +2,7 @@ module Svg.Icons
   ( iconCopy
   , iconPlus
   , iconSelectArrow
+  , iconShuffle
   , iconSliders
   , iconTrash
   )
@@ -21,6 +22,9 @@ iconPlus = icon plus
 
 iconSelectArrow :: Icon
 iconSelectArrow = icon selectArrow
+
+iconShuffle :: Icon
+iconShuffle = icon shuffle
 
 iconSliders :: Icon
 iconSliders = icon sliders
@@ -50,6 +54,18 @@ selectArrow =
   """
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
     <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"></path>
+  </svg>
+  """
+
+shuffle :: String
+shuffle =
+  """
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="16 3 21 3 21 8"></polyline>
+    <line x1="4" y1="20" x2="21" y2="3"></line>
+    <polyline points="21 16 21 21 16 21"></polyline>
+    <line x1="15" y1="15" x2="21" y2="21"></line>
+    <line x1="4" y1="4" x2="9" y2="9"></line>
   </svg>
   """
 

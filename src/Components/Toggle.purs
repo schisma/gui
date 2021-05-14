@@ -31,6 +31,7 @@ type Input
 
 type State
   = { displayName :: String
+    , ignoreOnToggleHandler :: Boolean
     , selectedInstrument :: Instrument
     , size :: Int
     , synthParameter :: SynthParameter
@@ -55,7 +56,7 @@ component
   => H.Component q Input SynthControlOutput m
 component =
   H.mkComponent
-    { initialState: merge { toggle: Nothing }
+    { initialState: merge { toggle: Nothing, ignoreOnToggleHandler: true }
     , render
     , eval: H.mkEval $ H.defaultEval
       { handleAction = handleAction
@@ -70,16 +71,20 @@ component =
     HandleToggle toggleState -> do
       state <- H.get
 
-      let value = if toggleState then 1.0 else 0.0
-      let synthParameter = state.synthParameter { value = value }
-      let instrument =
-            updateSynthParameterValue state.selectedInstrument synthParameter
 
-      H.modify_ _ { selectedInstrument = instrument
-                  , synthParameter = synthParameter
-                  }
+      if state.ignoreOnToggleHandler then
+        H.modify_ _ { ignoreOnToggleHandler = false }
+      else do
+        let value = if toggleState then 1.0 else 0.0
+        let synthParameter = state.synthParameter { value = value }
+        let instrument =
+              updateSynthParameterValue state.selectedInstrument synthParameter
 
-      H.raise (UpdatedSynthParameter synthParameter instrument)
+        H.modify_ _ { selectedInstrument = instrument
+                    , synthParameter = synthParameter
+                    }
+
+        H.raise (UpdatedSynthParameter synthParameter instrument)
 
     Initialize -> do
       state <- H.get
@@ -99,10 +104,21 @@ component =
         H.modify_ _ { toggle = Just toggle }
 
     Receive record -> do
+      maybeToggle <- H.gets _.toggle
+
       H.modify_ _ { displayName = record.displayName
+                  , ignoreOnToggleHandler = true
                   , selectedInstrument = record.selectedInstrument
                   , size = record.size
+                  , synthParameter = record.synthParameter
                   }
+
+      case maybeToggle of
+        Nothing -> pure unit
+        Just toggle -> do
+          let value = record.synthParameter.value /= 0.0
+          updatedToggle <- H.liftEffect $ Nexus.updateToggleState toggle value
+          H.modify_ _ { toggle = Just updatedToggle }
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =

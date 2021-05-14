@@ -17,6 +17,7 @@
   , "ordered-collections"
   , "psci-support"
   , "purescript-uuid"
+  , "random"
   , "record"
   , "routing"
   , "routing-duplex"

@@ -36,6 +36,7 @@ import Capabilities.Resources.Midi ( class ManageMidi
                                    , sendMidiChannel
                                    , sendMidiMessage
                                    )
+import Capabilities.Resources.Synth (class ManageSynth)
 import Capabilities.Resources.Tracker ( class ManageTracker
                                       , getTrackerDataFromFile
                                       , play
@@ -94,6 +95,7 @@ type State
 
 data Action
   = ChangePanel Panel
+  | FocusMidiKeyboard
   | HandleMidiKeyboard MidiKeyboard.Output
   | HandleSettings Settings.Output
   | HandleSynth SynthControlOutput
@@ -120,6 +122,7 @@ component
   => LogMessage m
   => ManageInstrument m
   => ManageMidi m
+  => ManageSynth m
   => ManageTracker m
   => H.Component q Input Void m
 component = H.mkComponent
@@ -142,6 +145,9 @@ component = H.mkComponent
   handleAction = case _ of
     ChangePanel panel ->
       H.modify_ _ { displayedPanel = panel }
+
+    FocusMidiKeyboard ->
+      H.tell (Proxy :: _ "midiKeyboard") unit MidiKeyboard.Focus
 
     HandleMidiKeyboard output ->
       case output of
@@ -211,6 +217,11 @@ component = H.mkComponent
 
     HandleSynth output ->
       case output of
+        RandomizedSynthParameters instrument -> do
+          handleAction (UpdateInstrument instrument)
+          handleAction SendSelectedSynthParametersAsMidiCCMessages
+          handleAction FocusMidiKeyboard
+
         UpdatedSynthParameter synthParameter instrument -> do
           handleAction (UpdateInstrument instrument)
 
@@ -239,7 +250,7 @@ component = H.mkComponent
                   handleAction UpdateTrackerData
 
         Tracker.Blurred ->
-          H.tell (Proxy :: _ "midiKeyboard") unit MidiKeyboard.Focus
+          handleAction FocusMidiKeyboard
 
         Tracker.ChangedInstrument uuid trackIndices ->
           case parseUUID uuid of

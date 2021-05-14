@@ -14,6 +14,7 @@ import Type.Proxy (Proxy(..))
 import Capabilities.LogMessage (class LogMessage)
 import Capabilities.Resources.Instrument (class ManageInstrument)
 import Capabilities.Resources.Midi (class ManageMidi)
+import Capabilities.Resources.Synth (class ManageSynth)
 import Data.Instrument (Instrument)
 import Components.Synths.Profit as Profit
 import Components.Synths.SoundFont as SoundFont
@@ -45,6 +46,7 @@ component
   => MonadAsk { globalEnvironment :: GlobalEnvironment | r } m
   => ManageInstrument m
   => ManageMidi m
+  => ManageSynth m
   => H.Component q Input SynthControlOutput m
 component =
   H.mkComponent

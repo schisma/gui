@@ -116,12 +116,22 @@ component =
             H.modify_ _ { dial = Just dial }
 
     Receive record -> do
+      maybeDial <- H.gets _.dial
+
       H.modify_ _ { displayName = record.displayName
+                  , ignoreOnChangeHandler = true
                   , selectedInstrument = record.selectedInstrument
                   , showNumber = record.showNumber
                   , size = record.size
                   , synthParameter = record.synthParameter
                   }
+
+      case maybeDial of
+        Nothing -> pure unit
+        Just dial -> do
+          updatedDial <- H.liftEffect $
+            Nexus.updateDialValue dial record.synthParameter.value
+          H.modify_ _ { dial = Just updatedDial }
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =

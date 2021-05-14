@@ -84,6 +84,12 @@ radio element options onChangeCallback =
   runEffectFn3 _radio element options onChangeCallback
 
 
+foreign import _updateRadioIndex :: EffectFn2 Radio Int Radio
+
+updateRadioIndex :: Radio -> Int -> Effect Radio
+updateRadioIndex nexusRadio index = runEffectFn2 _updateRadioIndex nexusRadio index
+
+
 foreign import _slider
   :: EffectFn3 HTMLElement SliderOptions (Number -> Effect Unit) Slider
 
@@ -109,8 +115,15 @@ sliderWithNumber sliderElement numberElement options onChangeCallback =
   runEffectFn4 _sliderWithNumber sliderElement numberElement options onChangeCallback
 
 
+foreign import _updateSliderValue :: EffectFn2 Slider Number Slider
+
+updateSliderValue :: Slider -> Number -> Effect Slider
+updateSliderValue nexusSlider value = runEffectFn2 _updateSliderValue nexusSlider value
+
+
 foreign import _toggle
   :: EffectFn3 HTMLElement ToggleOptions (Boolean -> Effect Unit) Toggle
+
 
 toggle
   :: HTMLElement
@@ -121,7 +134,7 @@ toggle element options onChangeCallback =
   runEffectFn3 _toggle element options onChangeCallback
 
 
-foreign import _updateToggleState :: EffectFn2 Toggle Number Toggle
+foreign import _updateToggleState :: EffectFn2 Toggle Boolean Toggle
 
-updateToggleState :: Toggle -> Number -> Effect Toggle
+updateToggleState :: Toggle -> Boolean -> Effect Toggle
 updateToggleState nexusToggle value = runEffectFn2 _updateToggleState nexusToggle value

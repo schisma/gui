@@ -58,12 +58,6 @@ exports._sliderWithNumber = function(id, numberId, options, onChangeCallback) {
   return slider;
 }
 
-
-exports._updateDialValue = function(dial, value) {
-  dial.value = value;
-  return dial;
-}
-
 exports._toggle = function(id, options, onChangeCallback) {
   const toggle = new NexusUI.Toggle(id, options);
 
@@ -72,6 +66,26 @@ exports._toggle = function(id, options, onChangeCallback) {
   });
 
   return toggle;
+}
+
+
+exports._updateDialValue = function(dial, value) {
+  dial.value = value;
+  return dial;
+}
+
+exports._updateRadioIndex = function(radio, index) {
+  if (index == -1) {
+    radio.deselect();
+  } else {
+    radio.select(index);
+  }
+  return radio;
+}
+
+exports._updateSliderValue = function(slider, value) {
+  slider.value = value;
+  return slider;
 }
 
 exports._updateToggleState = function(toggle, state) {

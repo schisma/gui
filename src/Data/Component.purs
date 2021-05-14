@@ -10,4 +10,6 @@ import Data.Synth (SynthParameter)
 type OpaqueSlot slot = forall query. Slot query Void slot
 
 data SynthControlOutput
-  = UpdatedSynthParameter SynthParameter Instrument
+  = RandomizedSynthParameters Instrument
+  | UpdatedSynthParameter SynthParameter Instrument
+

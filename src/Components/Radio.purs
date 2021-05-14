@@ -33,6 +33,7 @@ type Input
 
 type State
   = { displayName :: String
+    , ignoreOnChangeHandler :: Boolean
     , radio :: Maybe Nexus.Radio
     , selectedInstrument :: Instrument
     , size :: Array Int
@@ -57,7 +58,7 @@ component
   => H.Component q Input SynthControlOutput m
 component =
   H.mkComponent
-    { initialState: merge { radio: Nothing }
+    { initialState: merge { radio: Nothing, ignoreOnChangeHandler: true }
     , render
     , eval: H.mkEval $ H.defaultEval
       { handleAction = handleAction
@@ -72,15 +73,18 @@ component =
     HandleChange value -> do
       state <- H.get
 
-      let synthParameter = state.synthParameter { value = value + 1.0 }
-      let instrument =
-            updateSynthParameterValue state.selectedInstrument synthParameter
+      if state.ignoreOnChangeHandler then do
+        H.modify_ _ { ignoreOnChangeHandler = false }
+      else do
+        let synthParameter = state.synthParameter { value = value + 1.0 }
+        let instrument =
+              updateSynthParameterValue state.selectedInstrument synthParameter
 
-      H.modify_ _ { selectedInstrument = instrument
-                  , synthParameter = synthParameter
-                  }
+        H.modify_ _ { selectedInstrument = instrument
+                    , synthParameter = synthParameter
+                    }
 
-      H.raise (UpdatedSynthParameter synthParameter instrument)
+        H.raise (UpdatedSynthParameter synthParameter instrument)
 
     Initialize -> do
       state <- H.get
@@ -103,11 +107,22 @@ component =
         H.modify_ _ { radio = Just radio }
 
     Receive record -> do
+      maybeRadio <- H.gets _.radio
+
       H.modify_ _ { displayName = record.displayName
+                  , ignoreOnChangeHandler = true
                   , selectedInstrument = record.selectedInstrument
                   , size = record.size
                   , synthParameter = record.synthParameter
                   }
+
+      case maybeRadio of
+        Nothing -> pure unit
+        Just radio -> do
+          let value = fromMaybe (-1) $
+                      fromNumber (record.synthParameter.value - 1.0)
+          updatedRadio <- H.liftEffect $ Nexus.updateRadioIndex radio value
+          H.modify_ _ { radio = Just updatedRadio }
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =

@@ -14,6 +14,7 @@ import Data.Argonaut.Decode.Class (decodeJson)
 import Data.Argonaut.Encode.Class (encodeJson)
 import Data.Either (Either(..))
 import Data.Log.Level (LogLevel(Debug, Error, Info, Warn))
+import Data.Map (fromFoldable)
 import Data.Maybe (Maybe(..))
 import Data.JSDate (toISOString)
 import Data.Traversable (for)
@@ -23,6 +24,7 @@ import Effect.Aff (Aff, ParAff)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Console as Console
+import Effect.Random (randomRange)
 import Routing.Duplex (print)
 import Routing.Hash (setHash)
 import Type.Equality (class TypeEquals, from)
@@ -40,6 +42,8 @@ import Capabilities.Resources.Tracker (class ManageTracker)
 import Data.Endpoint (Endpoint(..))
 import Data.Instrument (fromInstrumentJson)
 import Data.Route (routeCodec)
+import Data.Synth (updateSynthParameters)
+import Data.Utilities (roundToNearestMultiple)
 import Env (Env, LogEnvironment(LogDevelopment))
 import ThirdParty.Socket as Socket
 
@@ -124,6 +128,14 @@ instance manageSynthAppM :: ManageSynth AppM where
           Right decoded -> Just decoded
 
     pure synths
+
+  randomizeParameters synth = do
+    randomized <- for synth.parameters \parameter -> do
+      value <- liftEffect $ randomRange parameter.minimum parameter.maximum
+      pure $ Tuple parameter.name (roundToNearestMultiple value parameter.step)
+
+    let parameters = fromFoldable randomized
+    pure $ updateSynthParameters synth parameters
 
 
 instance manageTrackerAppM :: ManageTracker AppM where

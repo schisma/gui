@@ -11,18 +11,23 @@ import Data.UUID (UUID)
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
+import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Type.Proxy (Proxy(..))
+import Web.Event.Event (preventDefault)
+import Web.UIEvent.MouseEvent (MouseEvent, toEvent)
 
 import Capabilities.LogMessage (class LogMessage)
 import Capabilities.Resources.Midi (class ManageMidi)
+import Capabilities.Resources.Synth (class ManageSynth, randomizeParameters)
 import Components.Dial as Dial
 import Components.Radio as Radio
 import Components.Slider as Slider
 import Components.Toggle as Toggle
-import Data.Component (SynthControlOutput)
+import Data.Component (SynthControlOutput(..))
 import Data.Instrument (Instrument)
 import Env (GlobalEnvironment)
+import Svg.Icons (iconShuffle)
 
 type Slots
   = ( dial :: H.Slot (Const Void) SynthControlOutput (Tuple UUID String)
@@ -41,6 +46,7 @@ type State
 
 data Action
   = HandleSynthControl SynthControlOutput
+  | RandomizeSynthParameters MouseEvent Instrument
   | Receive { selectedInstrument :: Instrument }
 
 component
@@ -49,6 +55,7 @@ component
   => LogMessage m
   => MonadAsk { globalEnvironment :: GlobalEnvironment | r } m
   => ManageMidi m
+  => ManageSynth m
   => H.Component q Input SynthControlOutput m
 component =
   H.mkComponent
@@ -63,6 +70,12 @@ component =
 
   handleAction :: Action -> H.HalogenM State Action Slots SynthControlOutput m Unit
   handleAction = case _ of
+    RandomizeSynthParameters mouseEvent instrument -> do
+      H.liftEffect $ preventDefault (toEvent mouseEvent)
+
+      synth <- randomizeParameters instrument.synth
+      H.raise (RandomizedSynthParameters $ instrument { synth = synth } )
+
     HandleSynthControl output -> H.raise output
 
     Receive record -> do
@@ -449,6 +462,53 @@ component =
                         (map HH.ClassName [ "inline-block", "mr-5" ])
                       ]
                       (renderDial state "mixerNoiseLevel" "Noise")
+                    ]
+                , HH.div
+                    [ HP.classes (map HH.ClassName [ "p-3"
+                                                   , "border"
+                                                   , "border-gray-300"
+                                                   , "border-solid"
+                                                   , "rounded"
+                                                   , "mt-5"
+                                                   ])
+                    ]
+                    [ HH.div
+                        [ HP.class_ (HH.ClassName "text-center") ]
+                        [ HH.h3_ [ HH.text "Stuck?"] ]
+                    , HH.div
+                      [ HP.classes
+                        (map HH.ClassName [ "text-center", "mt-3" ])
+                      ]
+                      [ HH.button
+                          [ HP.classes
+                            (map HH.ClassName [ "btn-white"
+                                              , "btn-normal"
+                                              ])
+                          , HE.onClick \event ->
+                            RandomizeSynthParameters
+                            event
+                            state.selectedInstrument
+                          ]
+                          [ HH.div
+                              [ HP.classes
+                                (map HH.ClassName [ "inline-block"
+                                                  , "align-middle"
+                                                  , "mr-1"
+                                                  ])
+                              ]
+                              [ iconShuffle
+                                  []
+                              ]
+                          , HH.div
+                              [ HP.classes
+                                (map HH.ClassName [ "inline-block"
+                                                  , "align-middle"
+                                                  ])
+                              ]
+                              [ HH.text "Randomize" ]
+                          ]
+                      ]
+
                     ]
                 ]
             , HH.div
