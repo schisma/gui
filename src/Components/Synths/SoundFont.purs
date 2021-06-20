@@ -133,7 +133,11 @@ component =
                     ]
                 ]
             , HH.div
-                [ HP.classes (map HH.ClassName [ "flex", "flex-col" ]) ]
+                [ HP.classes (map HH.ClassName [ "flex"
+                                               , "flex-col"
+                                               , "mr-5"
+                                               ])
+                ]
                 [ HH.div
                     [ HP.classes (map HH.ClassName [ "p-3"
                                                    , "border"
@@ -165,6 +169,24 @@ component =
                         (map HH.ClassName [ "inline-block" ])
                       ]
                       (renderDial state "amplifierRelease" "Release")
+                    ]
+                ]
+            , HH.div
+                [ HP.classes (map HH.ClassName [ "flex", "flex-col" ]) ]
+                [ HH.div
+                    [ HP.classes (map HH.ClassName [ "p-3"
+                                                   , "border"
+                                                   , "border-gray-300"
+                                                   , "border-solid"
+                                                   , "rounded"
+                                                   ])
+                    ]
+                    [ HH.div
+                        [ HP.class_ (HH.ClassName "text-center") ]
+                        [ HH.h3_ [ HH.text "Misc."] ]
+                    , HH.div
+                      [ HP.class_ (HH.ClassName "inline-block") ]
+                      (renderDial state "amplitude" "Volume")
                     ]
                 ]
             ]

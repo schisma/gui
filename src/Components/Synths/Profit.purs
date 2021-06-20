@@ -464,49 +464,50 @@ component =
                       (renderDial state "mixerNoiseLevel" "Noise")
                     ]
                 , HH.div
-                    [ HP.classes (map HH.ClassName [ "p-3"
-                                                   , "border"
-                                                   , "border-gray-300"
-                                                   , "border-solid"
-                                                   , "rounded"
-                                                   , "mt-5"
-                                                   ])
+                    [ HP.classes (map HH.ClassName [ "p-3", "mt-5" ])
                     ]
                     [ HH.div
-                        [ HP.class_ (HH.ClassName "text-center") ]
-                        [ HH.h3_ [ HH.text "Stuck?"] ]
-                    , HH.div
                       [ HP.classes
-                        (map HH.ClassName [ "text-center", "mt-3" ])
+                        (map HH.ClassName [ "mt-3", "flex", "items-center" ])
                       ]
-                      [ HH.button
-                          [ HP.classes
-                            (map HH.ClassName [ "btn-white"
-                                              , "btn-normal"
-                                              ])
-                          , HE.onClick \event ->
-                            RandomizeSynthParameters
-                            event
-                            state.selectedInstrument
-                          ]
-                          [ HH.div
-                              [ HP.classes
-                                (map HH.ClassName [ "inline-block"
-                                                  , "align-middle"
-                                                  , "mr-1"
-                                                  ])
-                              ]
-                              [ iconShuffle
-                                  []
-                              ]
-                          , HH.div
-                              [ HP.classes
-                                (map HH.ClassName [ "inline-block"
-                                                  , "align-middle"
-                                                  ])
-                              ]
-                              [ HH.text "Randomize" ]
-                          ]
+                      [ HH.div
+                        [ HP.classes
+                          (map HH.ClassName [ "inline-block", "mr-5" ])
+                        ]
+                        [ HH.button
+                            [ HP.classes
+                              (map HH.ClassName [ "btn-white"
+                                                , "btn-normal"
+                                                ])
+                            , HE.onClick \event ->
+                              RandomizeSynthParameters
+                              event
+                              state.selectedInstrument
+                            ]
+                            [ HH.div
+                                [ HP.classes
+                                  (map HH.ClassName [ "inline-block"
+                                                    , "align-middle"
+                                                    , "mr-1"
+                                                    ])
+                                ]
+                                [ iconShuffle
+                                    []
+                                ]
+                            , HH.div
+                                [ HP.classes
+                                  (map HH.ClassName [ "inline-block"
+                                                    , "align-middle"
+                                                    ])
+                                ]
+                                [ HH.text "Randomize" ]
+                            ]
+                        ]
+                      , HH.div
+                        [ HP.classes
+                          (map HH.ClassName [ "inline-block", "mr-5" ])
+                        ]
+                        (renderDial state "amplitude" "Volume")
                       ]
 
                     ]
