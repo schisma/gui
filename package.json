@@ -16,6 +16,11 @@
   "alias": {
     "utilities": "./src/ThirdParty/Utilities"
   },
+  "nodemonConfig": {
+    "ignore": [
+      "data/**/*.json"
+    ]
+  },
   "devDependencies": {
     "@tailwindcss/postcss7-compat": "^2.0.3",
     "autoprefixer": "^9.8.6",
@@ -33,6 +38,7 @@
     "express": "^4.17.1",
     "find-process": "^1.4.4",
     "fkill": "^7.1.0",
+    "fs-extra": "^9.1.0",
     "handsontable": "^8.3.2",
     "midi": "^1.0.0",
     "morgan": "^1.10.0",

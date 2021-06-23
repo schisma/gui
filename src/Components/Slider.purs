@@ -116,22 +116,24 @@ component =
             H.modify_ _ { slider = Just slider }
 
     Receive record -> do
-      maybeSlider <- H.gets _.slider
+      state <- H.get
 
-      H.modify_ _ { displayName = record.displayName
-                  , ignoreOnChangeHandler = true
-                  , selectedInstrument = record.selectedInstrument
-                  , showNumber = record.showNumber
-                  , size = record.size
-                  , synthParameter = record.synthParameter
-                  }
+      when (state.synthParameter /= record.synthParameter) do
+        let maybeSlider = state.slider
 
-      case maybeSlider of
-        Nothing -> pure unit
-        Just slider -> do
-          updatedSlider <- H.liftEffect $
-            Nexus.updateSliderValue slider record.synthParameter.value
-          H.modify_ _ { slider = Just updatedSlider }
+        H.modify_ _ { displayName = record.displayName
+                    , selectedInstrument = record.selectedInstrument
+                    , showNumber = record.showNumber
+                    , size = record.size
+                    , synthParameter = record.synthParameter
+                    }
+
+        case maybeSlider of
+          Nothing -> pure unit
+          Just slider -> do
+            updatedSlider <- H.liftEffect $
+              Nexus.updateSliderValue slider record.synthParameter.value
+            H.modify_ _ { slider = Just updatedSlider }
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =

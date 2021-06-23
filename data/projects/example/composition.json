@@ -1,0 +1,13 @@
+{
+  "trackerSettings": {
+    "parameterRenamings": {
+      "aa": "amplifierAttack",
+      "rel": "amplifierRelease",
+      "amp": "amplitude"
+    },
+    "frequencyMapper": {
+      "name": "default",
+      "arguments": []
+    }
+  }
+}

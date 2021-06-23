@@ -13,7 +13,7 @@ class Monad m <= ManageTracker m where
 
   updateTrackerData :: String -> String -> m Unit
 
-  play :: String -> String -> Int -> Int -> m (Either Error (Response Json))
+  play :: String -> Int -> Int -> m (Either Error (Response Json))
 
   stop :: m Unit
 
@@ -26,7 +26,7 @@ instance manageTrackerHalogenM
 
   updateTrackerData file = lift <<< updateTrackerData file
 
-  play trackerFile instrumentsFile startLine =
-    lift <<< play trackerFile instrumentsFile startLine
+  play projectFile startLine =
+    lift <<< play projectFile startLine
 
   stop = lift stop

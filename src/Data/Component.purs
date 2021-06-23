@@ -12,4 +12,3 @@ type OpaqueSlot slot = forall query. Slot query Void slot
 data SynthControlOutput
   = RandomizedSynthParameters Instrument
   | UpdatedSynthParameter SynthParameter Instrument
-

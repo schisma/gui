@@ -10,6 +10,7 @@ import Control.Monad.Reader.Trans
   , runReaderT
   )
 import Control.Parallel (class Parallel, parallel, sequential)
+import Data.Argonaut.Core (stringify)
 import Data.Argonaut.Decode.Class (decodeJson)
 import Data.Argonaut.Encode.Class (encodeJson)
 import Data.Either (Either(..))
@@ -37,6 +38,7 @@ import Capabilities.LogMessage (class LogMessage)
 import Capabilities.Navigate (class Navigate)
 import Capabilities.Resources.Instrument (class ManageInstrument)
 import Capabilities.Resources.Midi (class ManageMidi)
+import Capabilities.Resources.Project (class ManageProject)
 import Capabilities.Resources.Synth (class ManageSynth)
 import Capabilities.Resources.Tracker (class ManageTracker)
 import Data.Endpoint (Endpoint(..))
@@ -108,6 +110,18 @@ instance manageInstrumentAppM :: ManageInstrument AppM where
             uuid <- liftEffect genUUID
             pure $ fromInstrumentJson availableSynths uuid json
 
+  updateInstrumentsFile file instrumentsJson = do
+    let contents = stringify $ encodeJson instrumentsJson
+
+     -- TODO: Check status of request and show error message
+    void $ mkFormRequest { endpoint: UpdateInstruments
+                         , method: FormRequest.Put
+                           [ Tuple "contents" (Just contents)
+                           , Tuple "file" (Just file)
+                           ]
+                         }
+    pure unit
+
 
 instance manageMidiAppM :: ManageMidi AppM where
   sendMidiChannel socket channel =
@@ -115,6 +129,21 @@ instance manageMidiAppM :: ManageMidi AppM where
 
   sendMidiMessage socket message =
     liftEffect $ Socket.sendMidiMessage socket message
+
+
+instance manageProjectAppM :: ManageProject AppM where
+  getProjectFromFile file = do
+    result <- mkRequest { endpoint: ProjectFromFile { file }
+                        , method: Request.Get
+                        }
+    let
+      project = case result of
+        Nothing -> Nothing
+        Just response -> case decodeJson response of
+          Left decodeError -> Nothing
+          Right decoded -> Just decoded
+
+    pure project
 
 
 instance manageSynthAppM :: ManageSynth AppM where
@@ -159,13 +188,12 @@ instance manageTrackerAppM :: ManageTracker AppM where
                          }
     pure unit
 
-  play trackerFile instrumentsFile startLine endLine =
+  play projectFile startLine endLine =
     mkFormRequest { endpoint: Play
                   , method: FormRequest.Put
                     [ Tuple "endLine" (Just $ show endLine)
-                    , Tuple "instrumentsFile" (Just instrumentsFile)
+                    , Tuple "projectFile" (Just projectFile)
                     , Tuple "startLine" (Just $ show startLine)
-                    , Tuple "trackerFile" (Just trackerFile)
                     ]
                   }
 

@@ -19,6 +19,7 @@ import Capabilities.LogMessage (class LogMessage)
 import Capabilities.Navigate (class Navigate, navigate)
 import Capabilities.Resources.Instrument (class ManageInstrument)
 import Capabilities.Resources.Midi (class ManageMidi)
+import Capabilities.Resources.Project (class ManageProject)
 import Capabilities.Resources.Synth (class ManageSynth, getSynths)
 import Capabilities.Resources.Tracker (class ManageTracker)
 import Components.ClientError as ClientError
@@ -57,6 +58,7 @@ component
   => LogMessage m
   => ManageInstrument m
   => ManageMidi m
+  => ManageProject m
   => ManageSynth m
   => ManageTracker m
   => Navigate m

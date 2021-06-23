@@ -1,5 +1,5 @@
 const { exec, spawn } = require('child_process');
-const fs = require('fs');
+const fs = require('fs-extra');
 const path = require('path');
 
 const csv = require('csv-parser');
@@ -17,7 +17,7 @@ router.get('/', function(req, res, next) {
 });
 
 router.get('/instruments', function(req, res, next) {
-  const file = untildify(req.query.file);
+  const file = path.resolve(untildify(req.query.file));
 
   // TODO: Check for existence of file
 
@@ -26,12 +26,12 @@ router.get('/instruments', function(req, res, next) {
 });
 
 router.put('/instruments', function(req, res, next) {
-  const instrumentsFile = path.resolve(untildify(req.body.instrumentsFile));
+  const instrumentsFile = path.resolve(untildify(req.body.file));
 
   // TODO: Check for existence of file
 
-  const contents = JSON.parse(req.body.contents);
-  const output = JSON.stringify(contents, null, 2);
+  const instruments = JSON.parse(req.body.contents);
+  const output = JSON.stringify({ instruments: instruments }, null, 2);
 
   fs.writeFile(instrumentsFile, output, function(error) {
     if (error) {
@@ -45,14 +45,12 @@ router.put('/instruments', function(req, res, next) {
 router.put('/play', function(req, res, next) {
   fkill('csound', { silent: true });
 
-  const trackerFile = path.resolve(untildify(req.body.trackerFile));
-  const instrumentsFile = path.resolve(untildify(req.body.instrumentsFile));
+  const projectFile = path.resolve(untildify(req.body.projectFile));
 
   const schisma = spawn(schismaBin, [
     'tracker',
     'play',
-    '-t', trackerFile,
-    '-i', instrumentsFile,
+    '-p', projectFile,
     '-s', req.body.startLine,
     '-e', req.body.endLine,
   ], {
@@ -81,6 +79,33 @@ router.put('/play', function(req, res, next) {
   }
 
   findProcess();
+});
+
+router.get('/project', function(req, res, next) {
+  const file = path.resolve(untildify(req.query.file));
+  const dir = path.dirname(file);
+
+  if (!fs.existsSync(file)) {
+    try {
+      fs.accessSync(dir, fs.constants.W_OK);
+
+      const example = path.resolve(__dirname, '../data/projects/example');
+      fs.copySync(example, dir);
+
+      const projectFile = path.resolve(dir, './project.json');
+      fs.moveSync(projectFile, file);
+    } catch (error) {
+      file = undefined;
+    }
+  }
+
+  const contents = JSON.parse(fs.readFileSync(file, 'utf8'));
+
+  contents.compositionFile = path.resolve(dir, contents.compositionFile);
+  contents.instrumentsFile = path.resolve(dir, contents.instrumentsFile);
+  contents.trackerFile = path.resolve(dir, contents.trackerFile);
+
+  res.json(contents);
 });
 
 router.put('/stop', function(req, res, next) {
@@ -113,7 +138,7 @@ router.get('/tracker', function(req, res, next) {
     headers: false,
     mapValues: ({ header, index, value }) => value.trim()
   };
-  const file = untildify(req.query.file);
+  const file = path.resolve(untildify(req.query.file));
 
   // TODO: Check for existence of file
 

@@ -104,21 +104,23 @@ component =
         H.modify_ _ { toggle = Just toggle }
 
     Receive record -> do
-      maybeToggle <- H.gets _.toggle
+      state <- H.get
 
-      H.modify_ _ { displayName = record.displayName
-                  , ignoreOnToggleHandler = true
-                  , selectedInstrument = record.selectedInstrument
-                  , size = record.size
-                  , synthParameter = record.synthParameter
-                  }
+      when (state.synthParameter /= record.synthParameter) do
+        let maybeToggle = state.toggle
 
-      case maybeToggle of
-        Nothing -> pure unit
-        Just toggle -> do
-          let value = record.synthParameter.value /= 0.0
-          updatedToggle <- H.liftEffect $ Nexus.updateToggleState toggle value
-          H.modify_ _ { toggle = Just updatedToggle }
+        H.modify_ _ { displayName = record.displayName
+                    , selectedInstrument = record.selectedInstrument
+                    , size = record.size
+                    , synthParameter = record.synthParameter
+                    }
+
+        case maybeToggle of
+          Nothing -> pure unit
+          Just toggle -> do
+            let value = record.synthParameter.value /= 0.0
+            updatedToggle <- H.liftEffect $ Nexus.updateToggleState toggle value
+            H.modify_ _ { toggle = Just updatedToggle }
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =

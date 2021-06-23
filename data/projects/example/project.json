@@ -1,0 +1,5 @@
+{
+  "compositionFile": "./composition.json",
+  "instrumentsFile": "./instruments.json",
+  "trackerFile": "./tracker.csv"
+}

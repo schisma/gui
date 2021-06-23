@@ -17,7 +17,7 @@ import Data.Array ( (!!)
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Const (Const)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Traversable (traverse_)
 import Data.UUID (genUUID, parseUUID)
 import Effect.Aff.Class (class MonadAff)
@@ -31,11 +31,15 @@ import Type.Proxy (Proxy(..))
 import Capabilities.LogMessage (class LogMessage)
 import Capabilities.Resources.Instrument ( class ManageInstrument
                                          , getInstrumentsFromFile
+                                         , updateInstrumentsFile
                                          )
 import Capabilities.Resources.Midi ( class ManageMidi
                                    , sendMidiChannel
                                    , sendMidiMessage
                                    )
+import Capabilities.Resources.Project ( class ManageProject
+                                      , getProjectFromFile
+                                      )
 import Capabilities.Resources.Synth (class ManageSynth)
 import Capabilities.Resources.Tracker ( class ManageTracker
                                       , getTrackerDataFromFile
@@ -53,6 +57,7 @@ import Data.Instrument ( Instrument
                        , midiControlChangeMessages
                        , new
                        , remove
+                       , toInstrumentJson
                        )
 import Data.Midi (allowedCommands, midiMessage)
 import Data.Synth (Synth)
@@ -85,7 +90,8 @@ type Input
 type State
   = { displayedPanel :: Panel
     , instruments :: Array Instrument
-    , instrumentsFile :: String
+    , instrumentsFile :: Maybe String
+    , projectFile :: Maybe String
     , selectedTrackIndices :: Array Int
     , socket :: Socket
     , synths :: NonEmptyArray Synth
@@ -100,12 +106,16 @@ data Action
   | HandleSettings Settings.Output
   | HandleSynth SynthControlOutput
   | HandleTracker Tracker.Output
+  | LoadCompositionFile String
+  | LoadInstrumentsFile String
+  | LoadTrackerFile String
   | Receive { socket :: Socket
             , synths :: NonEmptyArray Synth
             }
   | SendMidiChannel
   | SendSelectedSynthParametersAsMidiCCMessages
   | UpdateInstrument Instrument
+  | UpdateInstrumentsFile
   | UpdateTrackerData
 
 data Panel
@@ -122,15 +132,17 @@ component
   => LogMessage m
   => ManageInstrument m
   => ManageMidi m
+  => ManageProject m
   => ManageSynth m
   => ManageTracker m
   => H.Component q Input Void m
 component = H.mkComponent
   { initialState: merge { displayedPanel: Configuration
                         , instruments: []
-                        , instrumentsFile: "~/code/compositions/proof/instruments.json"
+                        , instrumentsFile: Nothing
+                        , projectFile: Nothing
                         , selectedTrackIndices: []
-                        , trackerFile: "~/code/compositions/proof/tracker2.csv"
+                        , trackerFile: ""
                         , tracks: []
                         }
     , render
@@ -178,26 +190,8 @@ component = H.mkComponent
 
           H.modify_ _ { instruments = instrument : state.instruments }
 
-        Settings.ChangedInstrumentsFile file -> do
-          synths <- H.gets _.synths
-
-          instruments <- getInstrumentsFromFile synths file
-
-          H.modify_ _ { instruments = instruments
-                      , instrumentsFile = file
-                      }
-
-        Settings.ChangedTrackerFile file -> do
-          state <- H.get
-
-          trackerData <- getTrackerDataFromFile file
-          let tracks = fromTrackerData state.instruments trackerData
-              rows = fromMaybe [] $ tail trackerData
-
-          H.modify_ _ { trackerFile = file
-                      , tracks = tracks
-                      }
-          H.tell (Proxy :: _ "tracker") unit (Tracker.UpdateRows rows)
+        Settings.ChangedProjectFile file -> do
+          H.modify_ _ { projectFile = file }
 
         Settings.ClonedInstrument instrument -> do
           state <- H.get
@@ -207,6 +201,22 @@ component = H.mkComponent
           let clonedInstrument = instrument { id = uuid, number = number }
 
           H.modify_ _ { instruments = clonedInstrument : state.instruments }
+
+        Settings.LoadedProjectFile -> do
+          state <- H.get
+
+          case state.projectFile of
+            Nothing -> pure unit
+            Just projectFile -> do
+              maybeProject <- getProjectFromFile projectFile
+              case maybeProject of
+                Nothing -> pure unit
+                Just project -> do
+
+                  -- TODO: Fix
+                  --handleAction (LoadCompositionFile compositionFile)
+                  handleAction (LoadInstrumentsFile project.instrumentsFile)
+                  handleAction (LoadTrackerFile project.trackerFile)
 
         Settings.RemovedInstrument instrument -> do
           state <- H.get
@@ -269,13 +279,17 @@ component = H.mkComponent
 
         Tracker.Played start end -> do
           state <- H.get
-          result <- play state.trackerFile state.instrumentsFile start end
 
-          case result of
-            -- TODO: Some kind of error message
-            Left error -> pure unit
-            Right response ->
-              handleAction SendSelectedSynthParametersAsMidiCCMessages
+          case state.projectFile of
+            Nothing -> pure unit
+            Just projectFile -> do
+              result <- play projectFile start end
+
+              case result of
+                -- TODO: Some kind of error message
+                Left error -> pure unit
+                Right response ->
+                  handleAction SendSelectedSynthParametersAsMidiCCMessages
 
         Tracker.RemovedColumns columns -> do
           state <- H.get
@@ -318,6 +332,31 @@ component = H.mkComponent
         Tracker.UpdatedTrackerData ->
           handleAction UpdateTrackerData
 
+    LoadCompositionFile file -> do
+      -- TODO:
+      pure unit
+
+    LoadInstrumentsFile file -> do
+      synths <- H.gets _.synths
+
+      instruments <- getInstrumentsFromFile synths file
+
+      H.modify_ _ { instruments = instruments
+                  , instrumentsFile = Just file
+                  }
+
+    LoadTrackerFile file -> do
+      state <- H.get
+
+      trackerData <- getTrackerDataFromFile file
+      let tracks = fromTrackerData state.instruments trackerData
+          rows = fromMaybe [] $ tail trackerData
+
+      H.modify_ _ { trackerFile = file
+                  , tracks = tracks
+                  }
+      H.tell (Proxy :: _ "tracker") unit (Tracker.UpdateRows rows)
+
     Receive { socket, synths } ->
       H.modify_ _ { socket = socket
                   , synths = synths
@@ -350,6 +389,17 @@ component = H.mkComponent
             state.instruments
 
       H.modify_ _ { instruments = instruments }
+
+      handleAction UpdateInstrumentsFile
+
+    UpdateInstrumentsFile -> do
+      state <- H.get
+
+      case state.instrumentsFile of
+        Nothing -> pure unit
+        Just instrumentsFile -> do
+          let instrumentsJson = map toInstrumentJson state.instruments
+          updateInstrumentsFile instrumentsFile instrumentsJson
 
     UpdateTrackerData -> do
       let proxy = Proxy :: _ "tracker"
@@ -409,10 +459,10 @@ component = H.mkComponent
               unit
               Settings.component
               { instruments: state.instruments
-              , instrumentsFile: state.instrumentsFile
+              , projectFile: state.projectFile
               , selectedInstrument: instrument
+              , showInstruments: isJust state.instrumentsFile
               , synths: state.synths
-              , trackerFile: state.trackerFile
               }
               HandleSettings
 

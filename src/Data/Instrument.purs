@@ -5,14 +5,15 @@ import Data.Array (catMaybes)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray, find, head)
 import Data.Int (floor)
-import Data.Map (fromFoldable, singleton)
+import Data.Map as Map
 import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
-import Foreign.Object (Object, toUnfoldable)
+import Foreign.Object (Object, fromFoldable, toUnfoldable)
 
-import Data.Midi(MidiMessage, midiMessage)
-import Data.Synth(Synth, SynthParameter, updateSynthParameters)
-import Data.Utilities(scale)
+import Data.Midi (MidiMessage, midiMessage)
+import Data.Synth (Synth, SynthParameter, updateSynthParameters)
+import Data.Utilities (scale)
 
 type Instrument
   = { availableSynths :: NonEmptyArray Synth
@@ -43,7 +44,7 @@ fromInstrumentJson availableSynths id json =
                         Nothing -> head availableSynths
                         Just s -> s
 
-      parameters = fromFoldable $ (toUnfoldable json.parameters :: Array _)
+      parameters = Map.fromFoldable $ (toUnfoldable json.parameters :: Array _)
 
   in  { availableSynths: availableSynths
       , id
@@ -53,6 +54,17 @@ fromInstrumentJson availableSynths id json =
       , soundFontPath: json.soundFontPath
       , synth: updateSynthParameters synth parameters
       }
+
+toInstrumentJson :: Instrument -> InstrumentJson
+toInstrumentJson instrument =
+  { instrument: instrument.synth.name
+  , midiChannel: instrument.midiChannel
+  , name: instrument.name
+  , number: instrument.number
+  , parameters: fromFoldable $
+                map (\p -> Tuple p.name p.value) instrument.synth.parameters
+  , soundFontPath: instrument.soundFontPath
+  }
 
 midiControlChangeMessage :: Instrument -> SynthParameter -> Maybe MidiMessage
 midiControlChangeMessage instrument synthParameter =
@@ -100,6 +112,6 @@ updateSynth instrument synthName =
 
 updateSynthParameterValue :: Instrument -> SynthParameter -> Instrument
 updateSynthParameterValue instrument synthParameter =
-  let parameter = singleton synthParameter.name synthParameter.value
+  let parameter = Map.singleton synthParameter.name synthParameter.value
       synth = updateSynthParameters instrument.synth parameter
   in  instrument { synth = synth }

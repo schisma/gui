@@ -6,7 +6,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array.NonEmpty (NonEmptyArray)
 import Halogen (HalogenM)
 
-import Data.Instrument (Instrument)
+import Data.Instrument (Instrument, InstrumentJson)
 import Data.Synth (Synth)
 
 class Monad m <= ManageInstrument m where
@@ -15,6 +15,11 @@ class Monad m <= ManageInstrument m where
     -> String
     -> m (Array Instrument)
 
+  updateInstrumentsFile
+    :: String
+    -> Array InstrumentJson
+    -> m Unit
+
 instance manageInstrumentHalogenM
   :: ManageInstrument m
   => ManageInstrument (HalogenM st act slots msg m)
@@ -22,3 +27,5 @@ instance manageInstrumentHalogenM
 
   getInstrumentsFromFile availableSynths =
     lift <<< getInstrumentsFromFile availableSynths
+
+  updateInstrumentsFile file = lift <<< updateInstrumentsFile file
