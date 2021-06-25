@@ -15,9 +15,6 @@ import Record (merge)
 import Capabilities.LogMessage (class LogMessage)
 import Capabilities.Resources.Midi (class ManageMidi)
 import Data.Component (SynthControlOutput(..))
-import Data.Instrument ( Instrument
-                       , updateSynthParameterValue
-                       )
 import Data.Synth (SynthParameter)
 import Env (GlobalEnvironment)
 import ThirdParty.Nexus as Nexus
@@ -27,7 +24,6 @@ type Slots = ()
 
 type Input
   = { displayName :: String
-    , selectedInstrument :: Instrument
     , showNumber :: Boolean
     , size :: Int
     , synthParameter :: SynthParameter
@@ -37,7 +33,6 @@ type State
   = { dial :: Maybe Nexus.Dial
     , displayName :: String
     , ignoreOnChangeHandler :: Boolean
-    , selectedInstrument :: Instrument
     , showNumber :: Boolean
     , size :: Int
     , synthParameter :: SynthParameter
@@ -47,7 +42,6 @@ data Action
   = HandleChange Number
   | Initialize
   | Receive { displayName :: String
-            , selectedInstrument :: Instrument
             , showNumber :: Boolean
             , size :: Int
             , synthParameter :: SynthParameter
@@ -81,14 +75,10 @@ component =
         H.modify_ _ { ignoreOnChangeHandler = false }
       else do
         let synthParameter = state.synthParameter { value = value }
-        let instrument =
-              updateSynthParameterValue state.selectedInstrument synthParameter
 
-        H.modify_ _ { selectedInstrument = instrument
-                    , synthParameter = synthParameter
-                    }
+        H.modify_ _ { synthParameter = synthParameter }
 
-        H.raise (UpdatedSynthParameter synthParameter instrument)
+        H.raise (UpdatedSynthParameter synthParameter)
 
     Initialize -> do
       state <- H.get
@@ -122,7 +112,6 @@ component =
         let maybeDial = state.dial
 
         H.modify_ _ { displayName = record.displayName
-                    , selectedInstrument = record.selectedInstrument
                     , showNumber = record.showNumber
                     , size = record.size
                     , synthParameter = record.synthParameter

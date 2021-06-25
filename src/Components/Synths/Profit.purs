@@ -98,7 +98,6 @@ component =
               (Tuple selectedInstrument.id synthParameter.name)
               Dial.component
               { displayName
-              , selectedInstrument
               , showNumber: true
               , size: 50
               , synthParameter
@@ -124,7 +123,6 @@ component =
               (Tuple selectedInstrument.id synthParameter.name)
               Radio.component
               { displayName
-              , selectedInstrument
               , size: [180, 30]
               , synthParameter
               }
@@ -149,7 +147,6 @@ component =
               (Tuple selectedInstrument.id synthParameter.name)
               Slider.component
               { displayName
-              , selectedInstrument
               , showNumber: true
               , size: [20, 75]
               , synthParameter
@@ -175,7 +172,6 @@ component =
               (Tuple selectedInstrument.id synthParameter.name)
               Toggle.component
               { displayName
-              , selectedInstrument
               , size: 20
               , synthParameter
               }

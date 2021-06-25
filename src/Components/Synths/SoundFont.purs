@@ -79,7 +79,6 @@ component =
               (Tuple selectedInstrument.id synthParameter.name)
               Dial.component
               { displayName
-              , selectedInstrument
               , showNumber: true
               , size: 50
               , synthParameter

@@ -16,7 +16,6 @@ import Record (merge)
 import Capabilities.LogMessage (class LogMessage)
 import Capabilities.Resources.Midi (class ManageMidi)
 import Data.Component (SynthControlOutput(..))
-import Data.Instrument (Instrument, updateSynthParameterValue)
 import Data.Synth (SynthParameter)
 import Env (GlobalEnvironment)
 import ThirdParty.Nexus as Nexus
@@ -26,16 +25,13 @@ type Slots = ()
 
 type Input
   = { displayName :: String
-    , selectedInstrument :: Instrument
     , size :: Array Int
     , synthParameter :: SynthParameter
     }
 
 type State
   = { displayName :: String
-    , ignoreOnChangeHandler :: Boolean
     , radio :: Maybe Nexus.Radio
-    , selectedInstrument :: Instrument
     , size :: Array Int
     , synthParameter :: SynthParameter
     }
@@ -44,7 +40,6 @@ data Action
   = HandleChange Number
   | Initialize
   | Receive { displayName :: String
-            , selectedInstrument :: Instrument
             , size :: Array Int
             , synthParameter :: SynthParameter
             }
@@ -58,7 +53,7 @@ component
   => H.Component q Input SynthControlOutput m
 component =
   H.mkComponent
-    { initialState: merge { radio: Nothing, ignoreOnChangeHandler: true }
+    { initialState: merge { radio: Nothing }
     , render
     , eval: H.mkEval $ H.defaultEval
       { handleAction = handleAction
@@ -73,18 +68,11 @@ component =
     HandleChange value -> do
       state <- H.get
 
-      if state.ignoreOnChangeHandler then do
-        H.modify_ _ { ignoreOnChangeHandler = false }
-      else do
-        let synthParameter = state.synthParameter { value = value + 1.0 }
-        let instrument =
-              updateSynthParameterValue state.selectedInstrument synthParameter
+      let synthParameter = state.synthParameter { value = value + 1.0 }
 
-        H.modify_ _ { selectedInstrument = instrument
-                    , synthParameter = synthParameter
-                    }
+      H.modify_ _ { synthParameter = synthParameter }
 
-        H.raise (UpdatedSynthParameter synthParameter instrument)
+      H.raise (UpdatedSynthParameter synthParameter)
 
     Initialize -> do
       state <- H.get
@@ -113,7 +101,6 @@ component =
         let maybeRadio = state.radio
 
         H.modify_ _ { displayName = record.displayName
-                    , selectedInstrument = record.selectedInstrument
                     , size = record.size
                     , synthParameter = record.synthParameter
                     }

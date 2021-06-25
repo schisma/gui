@@ -58,6 +58,7 @@ import Data.Instrument ( Instrument
                        , new
                        , remove
                        , toInstrumentJson
+                       , updateSynthParameterValue
                        )
 import Data.Midi (allowedCommands, midiMessage)
 import Data.Synth (Synth)
@@ -232,15 +233,21 @@ component = H.mkComponent
           handleAction SendSelectedSynthParametersAsMidiCCMessages
           handleAction FocusMidiKeyboard
 
-        UpdatedSynthParameter synthParameter instrument -> do
-          handleAction (UpdateInstrument instrument)
+        UpdatedSynthParameter synthParameter -> do
+          state <- H.get
 
-          when (instrument.midiChannel > 0) do
-            state <- H.get
+          case selectedInstrument state of
+            Nothing -> pure unit
+            Just originalInstrument -> do
+              let instrument =
+                    updateSynthParameterValue originalInstrument synthParameter
 
-            case midiControlChangeMessage instrument synthParameter of
-              Nothing -> pure unit
-              Just message -> sendMidiMessage state.socket message
+              handleAction (UpdateInstrument instrument)
+
+              when (instrument.midiChannel > 0) do
+                case midiControlChangeMessage instrument synthParameter of
+                  Nothing -> pure unit
+                  Just message -> sendMidiMessage state.socket message
 
     HandleTracker output ->
       case output of

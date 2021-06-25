@@ -14,7 +14,6 @@ import Record (merge)
 import Capabilities.LogMessage (class LogMessage)
 import Capabilities.Resources.Midi (class ManageMidi)
 import Data.Component (SynthControlOutput(..))
-import Data.Instrument (Instrument, updateSynthParameterValue)
 import Data.Synth (SynthParameter)
 import Env (GlobalEnvironment)
 import ThirdParty.Nexus as Nexus
@@ -24,15 +23,12 @@ type Slots = ()
 
 type Input
   = { displayName :: String
-    , selectedInstrument :: Instrument
     , size :: Int
     , synthParameter :: SynthParameter
     }
 
 type State
   = { displayName :: String
-    , ignoreOnToggleHandler :: Boolean
-    , selectedInstrument :: Instrument
     , size :: Int
     , synthParameter :: SynthParameter
     , toggle :: Maybe Nexus.Toggle
@@ -42,7 +38,6 @@ data Action
   = HandleToggle Boolean
   | Initialize
   | Receive { displayName :: String
-            , selectedInstrument :: Instrument
             , size :: Int
             , synthParameter :: SynthParameter
             }
@@ -56,7 +51,7 @@ component
   => H.Component q Input SynthControlOutput m
 component =
   H.mkComponent
-    { initialState: merge { toggle: Nothing, ignoreOnToggleHandler: true }
+    { initialState: merge { toggle: Nothing }
     , render
     , eval: H.mkEval $ H.defaultEval
       { handleAction = handleAction
@@ -71,20 +66,12 @@ component =
     HandleToggle toggleState -> do
       state <- H.get
 
+      let value = if toggleState then 1.0 else 0.0
+      let synthParameter = state.synthParameter { value = value }
 
-      if state.ignoreOnToggleHandler then
-        H.modify_ _ { ignoreOnToggleHandler = false }
-      else do
-        let value = if toggleState then 1.0 else 0.0
-        let synthParameter = state.synthParameter { value = value }
-        let instrument =
-              updateSynthParameterValue state.selectedInstrument synthParameter
+      H.modify_ _ { synthParameter = synthParameter }
 
-        H.modify_ _ { selectedInstrument = instrument
-                    , synthParameter = synthParameter
-                    }
-
-        H.raise (UpdatedSynthParameter synthParameter instrument)
+      H.raise (UpdatedSynthParameter synthParameter)
 
     Initialize -> do
       state <- H.get
@@ -110,7 +97,6 @@ component =
         let maybeToggle = state.toggle
 
         H.modify_ _ { displayName = record.displayName
-                    , selectedInstrument = record.selectedInstrument
                     , size = record.size
                     , synthParameter = record.synthParameter
                     }
