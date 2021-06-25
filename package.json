@@ -3,13 +3,15 @@
   "version": "0.0.1",
   "description": "A GUI for Schisma",
   "scripts": {
-    "list_midi_inputs": "node ./bin/list_midi_inputs",
+    "list-midi-inputs": "node ./bin/list_midi_inputs",
     "start-server": "node ./bin/www",
-    "build:css": "node_modules/postcss-cli/bin/postcss dev/stylesheets/styles.css -o public/stylesheets/compiled.css",
+    "compile:css": "node_modules/postcss-cli/bin/postcss dev/stylesheets/styles.css -o public/stylesheets/compiled.css",
     "copy:css": "cp -r dev/stylesheets/ public/ && rm public/stylesheets/styles.css",
     "hot-reload:server": "nodemon --exec npm run start-server",
     "hot-reload:client": "parcel watch dev/index.js -d public/javascripts/",
-    "build-prod": "mkdir -p prod && cp dev/index.html prod/ && rm -rf dist && spago bundle-app --to prod/index.js && parcel build prod/index.html"
+    "build:css": "npm run compile:css && npm run copy:css",
+    "build:js": "spago build && parcel build dev/index.js -d public/javascripts",
+    "launch": "npm run build:css && npm run build:js && npm run start-server"
   },
   "author": "intercalations",
   "license": "MIT",
