@@ -46,7 +46,7 @@ type State
 
 data Action
   = HandleSynthControl SynthControlOutput
-  | RandomizeSynthParameters MouseEvent Instrument
+  | RandomizeSynthParameters Instrument MouseEvent
   | Receive { selectedInstrument :: Instrument }
 
 component
@@ -70,7 +70,7 @@ component =
 
   handleAction :: Action -> H.HalogenM State Action Slots SynthControlOutput m Unit
   handleAction = case _ of
-    RandomizeSynthParameters mouseEvent instrument -> do
+    RandomizeSynthParameters instrument mouseEvent -> do
       H.liftEffect $ preventDefault (toEvent mouseEvent)
 
       synth <- randomizeParameters instrument.synth
@@ -475,10 +475,8 @@ component =
                               (map HH.ClassName [ "btn-white"
                                                 , "btn-normal"
                                                 ])
-                            , HE.onClick \event ->
-                              RandomizeSynthParameters
-                              event
-                              state.selectedInstrument
+                            , HE.onClick $
+                              RandomizeSynthParameters state.selectedInstrument
                             ]
                             [ HH.div
                                 [ HP.classes

@@ -11,6 +11,8 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Web.Event.Event (preventDefault)
+import Web.UIEvent.MouseEvent (MouseEvent, toEvent)
 
 import Capabilities.LogMessage (class LogMessage)
 import Data.Instrument (Instrument, updateSynth)
@@ -40,11 +42,11 @@ data ChangedField
 
 data Action
   = ChangeField Instrument ChangedField
-  | Clone Instrument
+  | Clone Instrument MouseEvent
   | Receive { synths :: NonEmptyArray Synth
             , instrument :: Instrument
             }
-  | Remove Instrument
+  | Remove Instrument MouseEvent
 
 data Output
   = ClonedInstrument Instrument
@@ -82,13 +84,15 @@ component =
 
       H.raise (UpdatedInstrument updatedInstrument)
 
-    Clone instrument ->
+    Clone instrument mouseEvent -> do
+      H.liftEffect $ preventDefault (toEvent mouseEvent)
       H.raise (ClonedInstrument instrument)
 
     Receive record ->
       H.put record
 
-    Remove instrument ->
+    Remove instrument mouseEvent -> do
+      H.liftEffect $ preventDefault (toEvent mouseEvent)
       H.raise (RemovedInstrument instrument)
 
   render :: State -> H.ComponentHTML Action Slots m
@@ -223,7 +227,7 @@ component =
                                 [ HP.classes (map HH.ClassName [ "btn-blue"
                                                                , "btn-normal"
                                                                ])
-                                , HE.onClick \_ -> (Clone state.instrument)
+                                , HE.onClick $ Clone state.instrument
                                 ]
                                 [ HH.div
                                     [ HP.classes
@@ -264,7 +268,7 @@ component =
                                 [ HP.classes (map HH.ClassName [ "btn-red"
                                                                , "btn-normal"
                                                                ])
-                                , HE.onClick \_ -> (Remove state.instrument)
+                                , HE.onClick $ Remove state.instrument
                                 ]
                                 [ HH.div
                                     [ HP.classes
