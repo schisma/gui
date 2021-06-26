@@ -242,12 +242,13 @@ component = H.mkComponent
               let instrument =
                     updateSynthParameterValue originalInstrument synthParameter
 
-              handleAction (UpdateInstrument instrument)
+              when (instrument /= originalInstrument) do
+                handleAction (UpdateInstrument instrument)
 
-              when (instrument.midiChannel > 0) do
-                case midiControlChangeMessage instrument synthParameter of
-                  Nothing -> pure unit
-                  Just message -> sendMidiMessage state.socket message
+                when (instrument.midiChannel > 0) do
+                  case midiControlChangeMessage instrument synthParameter of
+                    Nothing -> pure unit
+                    Just message -> sendMidiMessage state.socket message
 
     HandleTracker output ->
       case output of
